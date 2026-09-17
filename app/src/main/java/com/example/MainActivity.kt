@@ -13,7 +13,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.data.model.MinistryRole
+import com.example.data.model.MinistryRoles
 import com.example.ui.components.*
 import com.example.ui.screens.*
 import com.example.ui.theme.*
@@ -42,6 +42,7 @@ fun YouthTransformersApp(
     val currentSection by viewModel.selectedSection.collectAsState()
     val currentLang by viewModel.appLanguage.collectAsState()
     val snackbarMessage by viewModel.snackbarMessage.collectAsState()
+    val attemptedSection by viewModel.attemptedSection.collectAsState()
 
     // Data streams
     val users by viewModel.users.collectAsState()
@@ -69,13 +70,6 @@ fun YouthTransformersApp(
 
     var showMustChangePasswordDialog by remember { mutableStateOf(false) }
 
-    // Show must change password dialog if triggered
-    LaunchedEffect(currentUser) {
-        if (currentUser != null && currentUser?.mustChangePassword == true) {
-            showMustChangePasswordDialog = true
-        }
-    }
-
     // Snackbar listener
     LaunchedEffect(snackbarMessage) {
         snackbarMessage?.let { msg ->
@@ -85,7 +79,7 @@ fun YouthTransformersApp(
     }
 
     if (currentUser == null) {
-        // Login Screen with Quick Role Switcher (One-Click Demo Access)
+        // Enforce authentic credentials login flow
         LoginScreen(
             viewModel = viewModel,
             users = users,
@@ -97,7 +91,7 @@ fun YouthTransformersApp(
             drawerContent = {
                 NavDrawerContent(
                     currentSection = currentSection,
-                    userRole = currentUser?.role,
+                    currentUser = currentUser,
                     currentLang = currentLang,
                     onSelectSection = { section ->
                         viewModel.selectSection(section)
@@ -138,18 +132,90 @@ fun YouthTransformersApp(
                         .padding(innerPadding)
                 ) {
                     when (currentSection) {
-                        MinistryNavSection.DASHBOARD -> LeaderDashboardScreen(
-                            viewModel = viewModel,
-                            members = members,
-                            socialPosts = socialPosts,
-                            followUpCases = followUpCases,
-                            bibleStudies = bibleStudies,
-                            financialTransactions = financialTransactions,
-                            projects = projects,
-                            reports = committeeReports,
-                            announcements = announcements,
-                            currentLang = currentLang
-                        )
+                        MinistryNavSection.FIRST_LOGIN_PASSWORD -> {
+                            FirstLoginPasswordScreen(
+                                currentUser = currentUser,
+                                onPasswordChanged = { newPass ->
+                                    viewModel.changePassword(newPass) { }
+                                }
+                            )
+                        }
+                        MinistryNavSection.ACCESS_DENIED -> {
+                            AccessDeniedScreen(
+                                attemptedSection = attemptedSection,
+                                currentUser = currentUser,
+                                onReturnToDashboard = {
+                                    viewModel.selectSection(MinistryNavSection.DASHBOARD)
+                                }
+                            )
+                        }
+                        MinistryNavSection.DASHBOARD -> {
+                            // Role-specific home dashboards
+                            when (currentUser?.role) {
+                                MinistryRoles.LEADER -> LeaderDashboardScreen(
+                                    viewModel = viewModel,
+                                    members = members,
+                                    socialPosts = socialPosts,
+                                    followUpCases = followUpCases,
+                                    bibleStudies = bibleStudies,
+                                    financialTransactions = financialTransactions,
+                                    projects = projects,
+                                    reports = committeeReports,
+                                    announcements = announcements,
+                                    currentLang = currentLang
+                                )
+                                MinistryRoles.COMMITTEE_COORDINATOR -> CommitteeScreen(
+                                    viewModel = viewModel,
+                                    tasks = committeeTasks,
+                                    reports = committeeReports,
+                                    users = users,
+                                    currentUser = currentUser,
+                                    currentLang = currentLang
+                                )
+                                MinistryRoles.LEVEL1_LEADER -> Level1Screen(
+                                    viewModel = viewModel,
+                                    members = members,
+                                    discipleship = discipleship,
+                                    recommendations = recommendations,
+                                    currentLang = currentLang
+                                )
+                                MinistryRoles.SOCIAL_MEDIA -> SocialMediaScreen(
+                                    viewModel = viewModel,
+                                    posts = socialPosts,
+                                    interactions = socialInteractions,
+                                    currentLang = currentLang
+                                )
+                                MinistryRoles.MEMBER_CARE -> MemberCareScreen(
+                                    viewModel = viewModel,
+                                    members = members,
+                                    followUps = followUpCases,
+                                    currentLang = currentLang
+                                )
+                                MinistryRoles.BIBLE_STUDY -> BibleStudyScreen(
+                                    viewModel = viewModel,
+                                    bibleStudies = bibleStudies,
+                                    members = members,
+                                    currentLang = currentLang
+                                )
+                                MinistryRoles.ACCOUNTANT -> FinanceScreen(
+                                    viewModel = viewModel,
+                                    transactions = financialTransactions,
+                                    currentLang = currentLang
+                                )
+                                MinistryRoles.PROJECTS_MANAGER -> ProjectsEquipmentScreen(
+                                    viewModel = viewModel,
+                                    projects = projects,
+                                    equipment = equipment,
+                                    currentLang = currentLang
+                                )
+                                else -> AnnouncementsScreen(
+                                    viewModel = viewModel,
+                                    announcements = announcements,
+                                    currentUser = currentUser,
+                                    currentLang = currentLang
+                                )
+                            }
+                        }
                         MinistryNavSection.MEMBERS -> MemberManagementScreen(
                             viewModel = viewModel,
                             members = members,
@@ -236,13 +302,18 @@ fun YouthTransformersApp(
                             currentUser = currentUser,
                             currentLang = currentLang
                         )
+                        MinistryNavSection.MY_PROFILE -> SettingsScreen(
+                            viewModel = viewModel,
+                            currentUser = currentUser,
+                            currentLang = currentLang
+                        )
                     }
                 }
             }
         }
     }
 
-    // Force/Prompt password change dialog
+    // Modal Password change dialog for on-demand update
     if (showMustChangePasswordDialog) {
         var newPass by remember { mutableStateOf("") }
         var confirmPass by remember { mutableStateOf("") }
@@ -250,21 +321,15 @@ fun YouthTransformersApp(
 
         AlertDialog(
             onDismissRequest = {
-                if (currentUser?.mustChangePassword != true) {
-                    showMustChangePasswordDialog = false
-                }
+                showMustChangePasswordDialog = false
             },
             title = {
-                Text(
-                    text = if (currentUser?.mustChangePassword == true) "Security: Change Temporary Password" else "Change Password"
-                )
+                Text(text = "Change Account Password")
             },
             text = {
                 Column {
                     Text(
-                        text = if (currentUser?.mustChangePassword == true)
-                            "You are currently using an initial temporary password. Please set a new secure personal password to continue."
-                        else "Enter a new secure password for your account:",
+                        text = "Enter a new secure password for your account (minimum 6 characters):",
                         fontSize = 12.sp
                     )
                     Spacer(modifier = Modifier.height(10.dp))
@@ -305,13 +370,11 @@ fun YouthTransformersApp(
                     Text("Update Password")
                 }
             },
-            dismissButton = if (currentUser?.mustChangePassword != true) {
-                {
-                    TextButton(onClick = { showMustChangePasswordDialog = false }) {
-                        Text("Cancel")
-                    }
+            dismissButton = {
+                TextButton(onClick = { showMustChangePasswordDialog = false }) {
+                    Text("Cancel")
                 }
-            } else null
+            }
         )
     }
 }

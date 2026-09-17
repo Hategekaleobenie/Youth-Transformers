@@ -1,8 +1,10 @@
 package com.example.data.repository
 
-import com.example.data.local.YouthTransformersDao
 import com.example.data.local.SeedDataProvider
+import com.example.data.local.YouthTransformersDao
 import com.example.data.model.*
+import com.example.security.AuthorizationService
+import com.example.security.Permission
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.firstOrNull
 import java.text.SimpleDateFormat
@@ -21,82 +23,224 @@ class MinistryRepository(private val dao: YouthTransformersDao) {
         }
     }
 
+    // Security check helper
+    private suspend fun authorizeOrThrow(actor: UserEntity, permission: Permission, resource: String) {
+        try {
+            AuthorizationService.assertAuthorized(actor, permission, resource)
+        } catch (e: SecurityException) {
+            logActivity(
+                actorUid = actor.uid,
+                actorName = actor.displayName,
+                action = "ACCESS_DENIED",
+                resourceType = resource,
+                details = e.message ?: "Access denied",
+                result = "ACCESS_DENIED"
+            )
+            throw e
+        }
+    }
+
     // Authentication
-    suspend fun authenticate(identifier: String, rawPassword: String): UserEntity? {
-        val user = dao.getUserByEmailOrUsername(identifier.trim()) ?: return null
-        if (!user.isActive) return null
-        return if (SecurityUtils.verifyPassword(rawPassword, user.passwordHash)) {
-            logActivity(user.fullName, "Login Successful", "Authentication", "User logged in to platform")
-            user
-        } else null
+    suspend fun authenticate(identifier: String, rawPassword: String): Result<UserEntity> {
+        val trimmed = identifier.trim().lowercase()
+        val user = dao.getUserByEmail(trimmed)
+            ?: dao.getUserByEmailOrUid(identifier.trim())
+            ?: return Result.failure(IllegalArgumentException("Invalid email or password"))
+
+        if (user.status != "active") {
+            logActivity(
+                actorUid = user.uid,
+                actorName = user.displayName,
+                action = "LOGIN_FAILED",
+                resourceType = "SESSION",
+                details = "Account is disabled",
+                result = "ACCESS_DENIED"
+            )
+            return Result.failure(IllegalStateException("Account is disabled. Please contact the Ministry Leader."))
+        }
+
+        if (!SecurityUtils.verifyPassword(rawPassword, user.passwordHash, user.salt)) {
+            logActivity(
+                actorUid = user.uid,
+                actorName = user.displayName,
+                action = "LOGIN_FAILED",
+                resourceType = "SESSION",
+                details = "Invalid password credentials attempt",
+                result = "ACCESS_DENIED"
+            )
+            return Result.failure(IllegalArgumentException("Invalid email or password"))
+        }
+
+        dao.updateLastLogin(user.uid, System.currentTimeMillis())
+        logActivity(
+            actorUid = user.uid,
+            actorName = user.displayName,
+            action = "LOGIN_SUCCESS",
+            resourceType = "SESSION",
+            details = "User logged in with role: ${user.role}",
+            result = "SUCCESS"
+        )
+        return Result.success(user)
     }
 
-    suspend fun changePassword(userId: Long, newRawPass: String, operatorName: String): Boolean {
-        val hash = SecurityUtils.hashPassword(newRawPass)
-        dao.updatePassword(userId, hash)
-        logActivity(operatorName, "Password Changed", "User Account", "User id: $userId changed password")
-        return true
+    suspend fun getUserByUid(uid: String): UserEntity? = dao.getUserByUid(uid)
+
+    suspend fun changePassword(actor: UserEntity, newRawPass: String): Result<Boolean> {
+        if (newRawPass.length < 6) {
+            return Result.failure(IllegalArgumentException("Password must be at least 6 characters"))
+        }
+        val newSalt = SecurityUtils.generateSalt()
+        val newHash = SecurityUtils.hashPassword(newRawPass, newSalt)
+        dao.updatePassword(actor.uid, newHash, newSalt)
+        logActivity(
+            actorUid = actor.uid,
+            actorName = actor.displayName,
+            action = "PASSWORD_CHANGED",
+            resourceType = "USER_ACCOUNT",
+            details = "User successfully updated password",
+            result = "SUCCESS"
+        )
+        return Result.success(true)
     }
 
-    suspend fun resetPasswordByLeader(userId: Long, newRawPass: String, leaderName: String): Boolean {
-        val hash = SecurityUtils.hashPassword(newRawPass)
-        dao.updatePassword(userId, hash)
-        logActivity(leaderName, "Password Reset by Leader", "User Account", "Admin reset password for user id: $userId")
-        return true
+    suspend fun resetPasswordByLeader(targetUid: String, newRawPass: String, actor: UserEntity): Result<Boolean> {
+        authorizeOrThrow(actor, Permission.MANAGE_USERS, "users")
+        val targetUser = dao.getUserByUid(targetUid) ?: return Result.failure(IllegalArgumentException("User not found"))
+        val newSalt = SecurityUtils.generateSalt()
+        val newHash = SecurityUtils.hashPassword(newRawPass, newSalt)
+        dao.updatePassword(targetUid, newHash, newSalt)
+        logActivity(
+            actorUid = actor.uid,
+            actorName = actor.displayName,
+            action = "PASSWORD_RESET_BY_LEADER",
+            resourceType = "USER_ACCOUNT",
+            resourceId = targetUid,
+            details = "Leader reset password for ${targetUser.displayName}",
+            result = "SUCCESS"
+        )
+        return Result.success(true)
     }
 
-    // Users
+    // Users Management (Leader Only)
     fun getAllUsers(): Flow<List<UserEntity>> = dao.getAllUsers()
 
-    suspend fun createUser(user: UserEntity, operatorName: String): Long {
-        val id = dao.insertUser(user)
-        logActivity(operatorName, "User Created", "User Account", "Created account for ${user.fullName} (${user.role})")
-        return id
+    suspend fun createUser(user: UserEntity, actor: UserEntity) {
+        authorizeOrThrow(actor, Permission.MANAGE_USERS, "users")
+        dao.insertUser(user)
+        logActivity(
+            actorUid = actor.uid,
+            actorName = actor.displayName,
+            action = "USER_CREATED",
+            resourceType = "USER_ACCOUNT",
+            resourceId = user.uid,
+            details = "Created account for ${user.displayName} (${user.role})",
+            result = "SUCCESS"
+        )
     }
 
-    suspend fun updateUserRole(userId: Long, newRole: String, operatorName: String) {
-        dao.updateUserRole(userId, newRole)
-        logActivity(operatorName, "Role Changed", "User Account", "User $userId role updated to $newRole")
+    suspend fun updateUserRole(targetUid: String, newRole: String, actor: UserEntity) {
+        authorizeOrThrow(actor, Permission.MANAGE_USERS, "users")
+        dao.updateUserRole(targetUid, newRole)
+        logActivity(
+            actorUid = actor.uid,
+            actorName = actor.displayName,
+            action = "ROLE_CHANGED",
+            resourceType = "USER_ACCOUNT",
+            resourceId = targetUid,
+            details = "Updated user $targetUid role to $newRole",
+            result = "SUCCESS"
+        )
     }
 
-    suspend fun setUserActive(userId: Long, isActive: Boolean, operatorName: String) {
-        dao.setUserActive(userId, isActive)
-        val statusText = if (isActive) "Reactivated" else "Deactivated"
-        logActivity(operatorName, "Account $statusText", "User Account", "User $userId account status changed to $isActive")
+    suspend fun setUserStatus(targetUid: String, status: String, actor: UserEntity) {
+        authorizeOrThrow(actor, Permission.MANAGE_USERS, "users")
+        dao.setUserStatus(targetUid, status)
+        logActivity(
+            actorUid = actor.uid,
+            actorName = actor.displayName,
+            action = "ACCOUNT_STATUS_CHANGED",
+            resourceType = "USER_ACCOUNT",
+            resourceId = targetUid,
+            details = "User $targetUid status changed to $status",
+            result = "SUCCESS"
+        )
     }
 
     // Members
     fun getAllMembers(): Flow<List<MemberEntity>> = dao.getAllMembers()
     fun getLevel1Members(): Flow<List<MemberEntity>> = dao.getLevel1Members()
 
-    suspend fun addMember(member: MemberEntity, operatorName: String): Long {
+    suspend fun addMember(member: MemberEntity, actor: UserEntity): Long {
+        authorizeOrThrow(actor, Permission.ADD_EDIT_MEMBERS, "members")
         val id = dao.insertMember(member)
-        logActivity(operatorName, "Member Added", "Member", "Added member ${member.fullName}")
+        logActivity(
+            actorUid = actor.uid,
+            actorName = actor.displayName,
+            action = "MEMBER_ADDED",
+            resourceType = "MEMBER",
+            resourceId = id.toString(),
+            details = "Added member ${member.fullName}",
+            result = "SUCCESS"
+        )
         return id
     }
 
-    suspend fun updateMember(member: MemberEntity, operatorName: String) {
+    suspend fun updateMember(member: MemberEntity, actor: UserEntity) {
+        authorizeOrThrow(actor, Permission.ADD_EDIT_MEMBERS, "members")
         dao.updateMember(member)
-        logActivity(operatorName, "Member Updated", "Member", "Updated details for ${member.fullName}")
+        logActivity(
+            actorUid = actor.uid,
+            actorName = actor.displayName,
+            action = "MEMBER_UPDATED",
+            resourceType = "MEMBER",
+            resourceId = member.id.toString(),
+            details = "Updated details for ${member.fullName}",
+            result = "SUCCESS"
+        )
     }
 
-    suspend fun setMemberStatus(memberId: Long, memberName: String, status: String, operatorName: String) {
+    suspend fun setMemberStatus(memberId: Long, memberName: String, status: String, actor: UserEntity) {
+        authorizeOrThrow(actor, Permission.DEACTIVATE_MEMBERS, "members")
         dao.updateMemberStatus(memberId, status)
-        logActivity(operatorName, "Member Status Changed", "Member", "Changed $memberName status to $status")
+        logActivity(
+            actorUid = actor.uid,
+            actorName = actor.displayName,
+            action = "MEMBER_STATUS_CHANGED",
+            resourceType = "MEMBER",
+            resourceId = memberId.toString(),
+            details = "Changed $memberName status to $status",
+            result = "SUCCESS"
+        )
     }
 
     // Discipleship
     fun getDiscipleshipForMember(memberId: Long): Flow<List<DiscipleshipEntity>> = dao.getDiscipleshipForMember(memberId)
     fun getAllDiscipleship(): Flow<List<DiscipleshipEntity>> = dao.getAllDiscipleship()
 
-    suspend fun updateDiscipleship(record: DiscipleshipEntity, operatorName: String) {
+    suspend fun updateDiscipleship(record: DiscipleshipEntity, actor: UserEntity) {
+        authorizeOrThrow(actor, Permission.MANAGE_LEVEL1_CURRICULUM, "discipleship")
         dao.updateDiscipleship(record)
-        logActivity(operatorName, "Curriculum Progress Updated", "Discipleship", "${record.memberName} - ${record.topicName} marked as ${record.status}")
+        logActivity(
+            actorUid = actor.uid,
+            actorName = actor.displayName,
+            action = "DISCIPLESHIP_PROGRESS_UPDATED",
+            resourceType = "DISCIPLESHIP",
+            details = "${record.memberName} - ${record.topicName} marked as ${record.status}",
+            result = "SUCCESS"
+        )
     }
 
-    suspend fun addRecommendation(rec: ProgressionRecommendationEntity, operatorName: String) {
+    suspend fun addRecommendation(rec: ProgressionRecommendationEntity, actor: UserEntity) {
+        authorizeOrThrow(actor, Permission.RECOMMEND_PROGRESSION, "discipleship")
         dao.insertRecommendation(rec)
-        logActivity(operatorName, "Progression Recommended", "Discipleship", "Recommended ${rec.memberName} for ${rec.targetLevel}")
+        logActivity(
+            actorUid = actor.uid,
+            actorName = actor.displayName,
+            action = "PROGRESSION_RECOMMENDED",
+            resourceType = "DISCIPLESHIP",
+            details = "Recommended ${rec.memberName} for ${rec.targetLevel}",
+            result = "SUCCESS"
+        )
     }
 
     fun getAllRecommendations(): Flow<List<ProgressionRecommendationEntity>> = dao.getAllRecommendations()
@@ -105,146 +249,301 @@ class MinistryRepository(private val dao: YouthTransformersDao) {
     fun getAllSocialPosts(): Flow<List<SocialPostEntity>> = dao.getAllSocialPosts()
     fun getAllSocialInteractions(): Flow<List<SocialInteractionEntity>> = dao.getAllSocialInteractions()
 
-    suspend fun addSocialPost(post: SocialPostEntity, operatorName: String) {
+    suspend fun addSocialPost(post: SocialPostEntity, actor: UserEntity) {
+        authorizeOrThrow(actor, Permission.MANAGE_CONTENT_CALENDAR, "social_media")
         dao.insertSocialPost(post)
-        logActivity(operatorName, "Social Post Created", "Social Media", "Post: ${post.title} on ${post.platform}")
+        logActivity(
+            actorUid = actor.uid,
+            actorName = actor.displayName,
+            action = "SOCIAL_POST_CREATED",
+            resourceType = "SOCIAL_MEDIA",
+            details = "Post: ${post.title} on ${post.platform}",
+            result = "SUCCESS"
+        )
     }
 
-    suspend fun updateSocialPost(post: SocialPostEntity, operatorName: String) {
+    suspend fun updateSocialPost(post: SocialPostEntity, actor: UserEntity) {
+        authorizeOrThrow(actor, Permission.MANAGE_CONTENT_CALENDAR, "social_media")
         dao.updateSocialPost(post)
-        logActivity(operatorName, "Social Post Updated", "Social Media", "Post: ${post.title} status ${post.status}")
+        logActivity(
+            actorUid = actor.uid,
+            actorName = actor.displayName,
+            action = "SOCIAL_POST_UPDATED",
+            resourceType = "SOCIAL_MEDIA",
+            details = "Post: ${post.title} status ${post.status}",
+            result = "SUCCESS"
+        )
     }
 
-    suspend fun addSocialInteraction(interaction: SocialInteractionEntity, operatorName: String) {
+    suspend fun addSocialInteraction(interaction: SocialInteractionEntity, actor: UserEntity) {
+        authorizeOrThrow(actor, Permission.TRIAGE_SOCIAL_INTERACTIONS, "social_media")
         dao.insertSocialInteraction(interaction)
-        logActivity(operatorName, "Interaction Logged", "Social Interaction", "${interaction.type} from ${interaction.senderName}")
+        logActivity(
+            actorUid = actor.uid,
+            actorName = actor.displayName,
+            action = "INTERACTION_LOGGED",
+            resourceType = "SOCIAL_INTERACTION",
+            details = "${interaction.type} from ${interaction.senderName}",
+            result = "SUCCESS"
+        )
     }
 
-    suspend fun updateSocialInteraction(interaction: SocialInteractionEntity) {
+    suspend fun updateSocialInteraction(interaction: SocialInteractionEntity, actor: UserEntity) {
+        authorizeOrThrow(actor, Permission.TRIAGE_SOCIAL_INTERACTIONS, "social_media")
         dao.updateSocialInteraction(interaction)
+        logActivity(
+            actorUid = actor.uid,
+            actorName = actor.displayName,
+            action = "INTERACTION_UPDATED",
+            resourceType = "SOCIAL_INTERACTION",
+            details = "Interaction from ${interaction.senderName} marked as ${interaction.status}",
+            result = "SUCCESS"
+        )
     }
 
     // Member Care & Follow-ups
     fun getAllFollowUpCases(): Flow<List<FollowUpCaseEntity>> = dao.getAllFollowUpCases()
-    fun getFollowUpsForMember(memberId: Long): Flow<List<FollowUpCaseEntity>> = dao.getFollowUpsForMember(memberId)
 
-    suspend fun addFollowUpCase(case: FollowUpCaseEntity, operatorName: String) {
+    suspend fun addFollowUpCase(case: FollowUpCaseEntity, actor: UserEntity) {
+        authorizeOrThrow(actor, Permission.MANAGE_FOLLOW_UPS, "member_care")
         dao.insertFollowUpCase(case)
-        logActivity(operatorName, "Follow-up Case Opened", "Member Care", "Case for ${case.memberName} (${case.reason})")
+        logActivity(
+            actorUid = actor.uid,
+            actorName = actor.displayName,
+            action = "FOLLOW_UP_CASE_OPENED",
+            resourceType = "MEMBER_CARE",
+            details = "Opened case for ${case.memberName} (${case.priority})",
+            result = "SUCCESS"
+        )
     }
 
-    suspend fun updateFollowUpCase(case: FollowUpCaseEntity, operatorName: String) {
+    suspend fun updateFollowUpCase(case: FollowUpCaseEntity, actor: UserEntity) {
+        authorizeOrThrow(actor, Permission.MANAGE_FOLLOW_UPS, "member_care")
         dao.updateFollowUpCase(case)
-        logActivity(operatorName, "Follow-up Case Updated", "Member Care", "Case ${case.id} (${case.memberName}) status: ${case.status}")
+        logActivity(
+            actorUid = actor.uid,
+            actorName = actor.displayName,
+            action = "FOLLOW_UP_CASE_UPDATED",
+            resourceType = "MEMBER_CARE",
+            details = "Updated case for ${case.memberName} status: ${case.status}",
+            result = "SUCCESS"
+        )
     }
 
-    // Bible Studies
+    // Bible Studies & Attendance
     fun getAllBibleStudies(): Flow<List<BibleStudyEntity>> = dao.getAllBibleStudies()
-
-    suspend fun addBibleStudy(study: BibleStudyEntity, operatorName: String) {
-        dao.insertBibleStudy(study)
-        logActivity(operatorName, "Bible Study Scheduled", "Bible Study", "Topic: ${study.topic} by ${study.preacher}")
-    }
-
-    // Attendance
     fun getAllAttendanceRecords(): Flow<List<AttendanceRecordEntity>> = dao.getAllAttendanceRecords()
-    fun getAttendanceForMember(memberId: Long): Flow<List<AttendanceRecordEntity>> = dao.getAttendanceForMember(memberId)
 
-    suspend fun recordAttendance(record: AttendanceRecordEntity, operatorName: String) {
-        dao.insertAttendanceRecord(record)
-        logActivity(operatorName, "Attendance Recorded", "Attendance", "${record.memberName} marked as ${record.status} in ${record.activityTitle}")
+    suspend fun addBibleStudy(study: BibleStudyEntity, actor: UserEntity) {
+        authorizeOrThrow(actor, Permission.MANAGE_BIBLE_STUDIES, "bible_study")
+        dao.insertBibleStudy(study)
+        logActivity(
+            actorUid = actor.uid,
+            actorName = actor.displayName,
+            action = "BIBLE_STUDY_SCHEDULED",
+            resourceType = "BIBLE_STUDY",
+            details = "Study: ${study.topic} on ${study.dateStr}",
+            result = "SUCCESS"
+        )
     }
 
-    // Finance
+    suspend fun addAttendanceRecord(record: AttendanceRecordEntity, actor: UserEntity) {
+        authorizeOrThrow(actor, Permission.LOG_ATTENDANCE, "attendance")
+        dao.insertAttendanceRecord(record)
+        logActivity(
+            actorUid = actor.uid,
+            actorName = actor.displayName,
+            action = "ATTENDANCE_LOGGED",
+            resourceType = "ATTENDANCE",
+            details = "Attendance logged for ${record.activityTitle} on ${record.dateStr}",
+            result = "SUCCESS"
+        )
+    }
+
+    // Finance (Restricted to Accountant & Leader)
     fun getAllFinancialTransactions(): Flow<List<FinancialTransactionEntity>> = dao.getAllFinancialTransactions()
 
-    suspend fun addTransaction(tx: FinancialTransactionEntity, operatorName: String) {
+    suspend fun addTransaction(tx: FinancialTransactionEntity, actor: UserEntity) {
+        authorizeOrThrow(actor, Permission.MANAGE_TRANSACTIONS, "finance")
         dao.insertFinancialTransaction(tx)
-        logActivity(operatorName, "Financial Transaction Created", "Finance", "${tx.type} ${tx.amount} RWF - ${tx.description}")
+        logActivity(
+            actorUid = actor.uid,
+            actorName = actor.displayName,
+            action = "TRANSACTION_LOGGED",
+            resourceType = "FINANCE",
+            details = "${tx.type}: ${tx.amount} RWF - ${tx.description}",
+            result = "SUCCESS"
+        )
     }
 
     // Projects & Equipment
     fun getAllProjects(): Flow<List<ProjectEntity>> = dao.getAllProjects()
     fun getAllEquipment(): Flow<List<EquipmentEntity>> = dao.getAllEquipment()
 
-    suspend fun addProject(project: ProjectEntity, operatorName: String) {
+    suspend fun addProject(project: ProjectEntity, actor: UserEntity) {
+        authorizeOrThrow(actor, Permission.MANAGE_PROJECTS, "projects")
         dao.insertProject(project)
-        logActivity(operatorName, "Project Created", "Project", project.name)
+        logActivity(
+            actorUid = actor.uid,
+            actorName = actor.displayName,
+            action = "PROJECT_CREATED",
+            resourceType = "PROJECTS",
+            details = "Project: ${project.name}",
+            result = "SUCCESS"
+        )
     }
 
-    suspend fun updateProject(project: ProjectEntity, operatorName: String) {
-        dao.updateProject(project)
-        logActivity(operatorName, "Project Updated", "Project", "${project.name} (${project.progressPercent}%)")
+    suspend fun addEquipment(equipment: EquipmentEntity, actor: UserEntity) {
+        authorizeOrThrow(actor, Permission.MANAGE_EQUIPMENT, "equipment")
+        dao.insertEquipment(equipment)
+        logActivity(
+            actorUid = actor.uid,
+            actorName = actor.displayName,
+            action = "EQUIPMENT_ADDED",
+            resourceType = "EQUIPMENT",
+            details = "Item: ${equipment.name} (${equipment.category})",
+            result = "SUCCESS"
+        )
     }
 
-    suspend fun addEquipment(item: EquipmentEntity, operatorName: String) {
-        dao.insertEquipment(item)
-        logActivity(operatorName, "Equipment Added", "Equipment", "${item.name} (${item.category})")
+    suspend fun updateEquipment(equipment: EquipmentEntity, actor: UserEntity) {
+        authorizeOrThrow(actor, Permission.MANAGE_EQUIPMENT, "equipment")
+        dao.updateEquipment(equipment)
+        logActivity(
+            actorUid = actor.uid,
+            actorName = actor.displayName,
+            action = "EQUIPMENT_UPDATED",
+            resourceType = "EQUIPMENT",
+            details = "Item: ${equipment.name} status: ${equipment.status}",
+            result = "SUCCESS"
+        )
     }
 
-    suspend fun updateEquipment(item: EquipmentEntity, operatorName: String) {
-        dao.updateEquipment(item)
-        logActivity(operatorName, "Equipment Updated", "Equipment", "${item.name} status: ${item.status}")
-    }
-
-    // Committee Reports & Tasks
-    fun getAllCommitteeReports(): Flow<List<CommitteeReportEntity>> = dao.getAllCommitteeReports()
+    // Committee Tasks & Reports
     fun getAllCommitteeTasks(): Flow<List<CommitteeTaskEntity>> = dao.getAllCommitteeTasks()
+    fun getAllCommitteeReports(): Flow<List<CommitteeReportEntity>> = dao.getAllCommitteeReports()
 
-    suspend fun submitReport(report: CommitteeReportEntity) {
+    suspend fun addCommitteeReport(report: CommitteeReportEntity, actor: UserEntity) {
+        authorizeOrThrow(actor, Permission.SUBMIT_COMMITTEE_REPORTS, "committee")
         dao.insertCommitteeReport(report)
-        logActivity(report.authorName, "Report Submitted", "Committee", "${report.reportType} submitted by ${report.authorName}")
+        logActivity(
+            actorUid = actor.uid,
+            actorName = actor.displayName,
+            action = "COMMITTEE_REPORT_SUBMITTED",
+            resourceType = "COMMITTEE",
+            details = "Report: ${report.reportType} by ${report.authorName}",
+            result = "SUCCESS"
+        )
     }
 
-    suspend fun addTask(task: CommitteeTaskEntity, operatorName: String) {
+    suspend fun addCommitteeTask(task: CommitteeTaskEntity, actor: UserEntity) {
+        authorizeOrThrow(actor, Permission.MANAGE_COMMITTEE_TASKS, "committee")
         dao.insertCommitteeTask(task)
-        logActivity(operatorName, "Committee Task Assigned", "Committee", "${task.title} to ${task.assignedToName}")
+        logActivity(
+            actorUid = actor.uid,
+            actorName = actor.displayName,
+            action = "COMMITTEE_TASK_ASSIGNED",
+            resourceType = "COMMITTEE",
+            details = "${task.title} to ${task.assignedToName}",
+            result = "SUCCESS"
+        )
     }
 
-    suspend fun updateTask(task: CommitteeTaskEntity, operatorName: String) {
+    suspend fun updateTask(task: CommitteeTaskEntity, actor: UserEntity) {
+        authorizeOrThrow(actor, Permission.MANAGE_COMMITTEE_TASKS, "committee")
         dao.updateCommitteeTask(task)
         val statusStr = if (task.isCompleted) "Completed" else "In Progress"
-        logActivity(operatorName, "Task Status Updated", "Committee", "${task.title} marked as $statusStr")
+        logActivity(
+            actorUid = actor.uid,
+            actorName = actor.displayName,
+            action = "TASK_STATUS_UPDATED",
+            resourceType = "COMMITTEE",
+            details = "${task.title} marked as $statusStr",
+            result = "SUCCESS"
+        )
     }
 
     // Evangelism & Events
     fun getAllEvangelism(): Flow<List<EvangelismEntity>> = dao.getAllEvangelism()
     fun getAllMinistryEvents(): Flow<List<MinistryEventEntity>> = dao.getAllMinistryEvents()
 
-    suspend fun addEvangelism(outreach: EvangelismEntity, operatorName: String) {
+    suspend fun addEvangelism(outreach: EvangelismEntity, actor: UserEntity) {
+        authorizeOrThrow(actor, Permission.LOG_EVANGELISM, "evangelism")
         dao.insertEvangelism(outreach)
-        logActivity(operatorName, "Evangelism Outreach Logged", "Evangelism", outreach.title)
+        logActivity(
+            actorUid = actor.uid,
+            actorName = actor.displayName,
+            action = "EVANGELISM_OUTREACH_LOGGED",
+            resourceType = "EVANGELISM",
+            details = outreach.title,
+            result = "SUCCESS"
+        )
     }
 
-    suspend fun addMinistryEvent(event: MinistryEventEntity, operatorName: String) {
+    suspend fun addMinistryEvent(event: MinistryEventEntity, actor: UserEntity) {
+        authorizeOrThrow(actor, Permission.MANAGE_EVENTS, "events")
         dao.insertMinistryEvent(event)
-        logActivity(operatorName, "Event Created", "Events", event.name)
+        logActivity(
+            actorUid = actor.uid,
+            actorName = actor.displayName,
+            action = "EVENT_CREATED",
+            resourceType = "EVENTS",
+            details = event.name,
+            result = "SUCCESS"
+        )
     }
 
-    suspend fun updateMinistryEvent(event: MinistryEventEntity, operatorName: String) {
+    suspend fun updateMinistryEvent(event: MinistryEventEntity, actor: UserEntity) {
+        authorizeOrThrow(actor, Permission.MANAGE_EVENTS, "events")
         dao.updateMinistryEvent(event)
-        logActivity(operatorName, "Event Updated", "Events", "${event.name} (${event.status})")
+        logActivity(
+            actorUid = actor.uid,
+            actorName = actor.displayName,
+            action = "EVENT_UPDATED",
+            resourceType = "EVENTS",
+            details = "${event.name} (${event.status})",
+            result = "SUCCESS"
+        )
     }
 
     // Announcements
     fun getAllAnnouncements(): Flow<List<AnnouncementEntity>> = dao.getAllAnnouncements()
 
-    suspend fun addAnnouncement(announcement: AnnouncementEntity, operatorName: String) {
+    suspend fun addAnnouncement(announcement: AnnouncementEntity, actor: UserEntity) {
+        authorizeOrThrow(actor, Permission.POST_ANNOUNCEMENTS, "announcements")
         dao.insertAnnouncement(announcement)
-        logActivity(operatorName, "Announcement Published", "Announcements", announcement.title)
+        logActivity(
+            actorUid = actor.uid,
+            actorName = actor.displayName,
+            action = "ANNOUNCEMENT_PUBLISHED",
+            resourceType = "ANNOUNCEMENTS",
+            details = announcement.title,
+            result = "SUCCESS"
+        )
     }
 
-    // Activity Logs
+    // Activity Logs (Exclusively Leader)
     fun getAllActivityLogs(): Flow<List<ActivityLogEntity>> = dao.getAllActivityLogs()
 
-    private suspend fun logActivity(user: String, action: String, objectType: String, details: String) {
+    private suspend fun logActivity(
+        actorUid: String,
+        actorName: String,
+        action: String,
+        resourceType: String,
+        resourceId: String = "",
+        details: String = "",
+        result: String = "SUCCESS"
+    ) {
         dao.insertActivityLog(
             ActivityLogEntity(
-                userName = user,
+                actorUid = actorUid,
+                actorName = actorName,
                 action = action,
-                objectType = objectType,
-                dateStr = currentDateTime(),
-                details = details
+                resourceType = resourceType,
+                resourceId = resourceId,
+                details = details,
+                timestamp = System.currentTimeMillis(),
+                result = result
             )
         )
     }

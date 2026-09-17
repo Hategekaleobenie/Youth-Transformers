@@ -4,80 +4,99 @@ import com.example.data.model.*
 
 object SeedDataProvider {
     suspend fun populateDatabase(dao: YouthTransformersDao) {
-        val defaultPassHash = SecurityUtils.hashPassword("YouthTrans@2026")
+        val defaultSalt = "yt_init_salt_2026"
+        val defaultPassHash = SecurityUtils.hashPassword("Transform2026!", defaultSalt)
 
-        // 1. Initial Users
+        // 1. Initial Users with Real UIDs, Roles, and Salted Hashes
         val users = listOf(
             UserEntity(
-                fullName = "LEO BENIE HATEGEKA",
+                uid = "uid_leo_hategeka",
+                displayName = "LEO BENIE HATEGEKA",
                 email = "hategekabenie@gmail.com",
-                username = "benie",
+                role = MinistryRoles.LEADER,
+                status = "active",
                 passwordHash = defaultPassHash,
-                role = MinistryRole.MINISTRY_LEADER.name,
+                salt = defaultSalt,
                 phone = "+250 788 123 456"
             ),
             UserEntity(
-                fullName = "GREEN LONDON",
+                uid = "uid_green_london",
+                displayName = "GREEN LONDON",
                 email = "london@youthtransformers.org",
-                username = "london",
+                role = MinistryRoles.COMMITTEE_COORDINATOR,
+                status = "active",
                 passwordHash = defaultPassHash,
-                role = MinistryRole.COMMITTEE_COORDINATOR.name,
+                salt = defaultSalt,
                 phone = "+250 788 234 567"
             ),
             UserEntity(
-                fullName = "BONHEUR NDINZWE",
+                uid = "uid_bonheur_ndinzwe",
+                displayName = "BONHEUR NDINZWE",
                 email = "Ndinzwe@gmail.com",
-                username = "bonheur",
+                role = MinistryRoles.LEVEL1_LEADER,
+                status = "active",
                 passwordHash = defaultPassHash,
-                role = MinistryRole.LEVEL_1_LEADER.name,
+                salt = defaultSalt,
                 phone = "+250 788 345 678"
             ),
             UserEntity(
-                fullName = "KELLIA MWIZERWA",
+                uid = "uid_kellia_mwizerwa",
+                displayName = "KELLIA MWIZERWA",
                 email = "kellia@youthtransformers.org",
-                username = "kellia",
+                role = MinistryRoles.SOCIAL_MEDIA,
+                status = "active",
                 passwordHash = defaultPassHash,
-                role = MinistryRole.SOCIAL_MEDIA.name,
+                salt = defaultSalt,
                 phone = "+250 788 456 789"
             ),
             UserEntity(
-                fullName = "CEDRICK GISUBIZO",
+                uid = "uid_cedrick_gisubizo",
+                displayName = "CEDRICK GISUBIZO",
                 email = "gisubizocedrick720@gmail.com",
-                username = "cedrick",
+                role = MinistryRoles.MEMBER_CARE,
+                status = "active",
                 passwordHash = defaultPassHash,
-                role = MinistryRole.MEMBER_CARE.name,
+                salt = defaultSalt,
                 phone = "+250 788 567 890"
             ),
             UserEntity(
-                fullName = "LIONA AKALIZA",
+                uid = "uid_liona_akaliza",
+                displayName = "LIONA AKALIZA",
                 email = "akalizaliona@gmail.com",
-                username = "liona",
+                role = MinistryRoles.BIBLE_STUDY,
+                status = "active",
                 passwordHash = defaultPassHash,
-                role = MinistryRole.BIBLE_STUDY_COORDINATOR.name,
+                salt = defaultSalt,
                 phone = "+250 788 678 901"
             ),
             UserEntity(
-                fullName = "EBENEZER MUGISHA",
+                uid = "uid_ebenezer_mugisha",
+                displayName = "EBENEZER MUGISHA",
                 email = "ebenezer@youthtransformers.org",
-                username = "ebenezer",
+                role = MinistryRoles.ACCOUNTANT,
+                status = "active",
                 passwordHash = defaultPassHash,
-                role = MinistryRole.ACCOUNTANT.name,
+                salt = defaultSalt,
                 phone = "+250 788 789 012"
             ),
             UserEntity(
-                fullName = "RENE CYUBAHIRO",
-                email = "cyubahiro@youthtransformers.org",
-                username = "cyubahiro",
+                uid = "uid_rene_cyubahiro",
+                displayName = "RENE CYUBAHIRO",
+                email = "rene@youthtransformers.org",
+                role = MinistryRoles.PROJECTS_MANAGER,
+                status = "active",
                 passwordHash = defaultPassHash,
-                role = MinistryRole.PROJECTS_EQUIPMENT_MANAGER.name,
+                salt = defaultSalt,
                 phone = "+250 788 890 123"
             ),
             UserEntity(
-                fullName = "DAVID KWIZERA",
+                uid = "uid_david_kwizera",
+                displayName = "DAVID KWIZERA",
                 email = "david.kwizera@gmail.com",
-                username = "david",
+                role = MinistryRoles.MEMBER,
+                status = "active",
                 passwordHash = defaultPassHash,
-                role = MinistryRole.MEMBER.name,
+                salt = defaultSalt,
                 phone = "+250 788 901 234"
             )
         )
@@ -1015,25 +1034,31 @@ object SeedDataProvider {
         // 14. Activity Logs
         val logs = listOf(
             ActivityLogEntity(
-                userName = "Leo Benie Hategeka",
+                actorUid = "uid_leo_hategeka",
+                actorName = "LEO BENIE HATEGEKA",
                 action = "Platform Initialized",
-                objectType = "System",
-                dateStr = "2026-09-17 10:00",
-                details = "Youth Transformers digital platform seed data loaded successfully."
+                resourceType = "System",
+                resourceId = "sys_init",
+                details = "Youth Transformers platform database initialized with role-based security.",
+                result = "SUCCESS"
             ),
             ActivityLogEntity(
-                userName = "Green London",
+                actorUid = "uid_green_london",
+                actorName = "GREEN LONDON",
                 action = "Committee Task Assigned",
-                objectType = "Task",
-                dateStr = "2026-09-16 14:20",
-                details = "Assigned Q3 financial report preparation to Ebenezer Mugisha."
+                resourceType = "Task",
+                resourceId = "task_q3",
+                details = "Assigned Q3 financial report preparation to Ebenezer Mugisha.",
+                result = "SUCCESS"
             ),
             ActivityLogEntity(
-                userName = "Cedrick Gisubizo",
+                actorUid = "uid_cedrick_gisubizo",
+                actorName = "CEDRICK GISUBIZO",
                 action = "Follow-up Case Opened",
-                objectType = "MemberCare",
-                dateStr = "2026-09-10 11:30",
-                details = "Opened pastoral care case for Gloria Mutoni."
+                resourceType = "MemberCare",
+                resourceId = "case_gloria",
+                details = "Opened pastoral care case for Gloria Mutoni.",
+                result = "SUCCESS"
             )
         )
         dao.insertActivityLogs(logs)

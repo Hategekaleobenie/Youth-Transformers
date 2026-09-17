@@ -197,10 +197,14 @@ fun UserManagementScreen(
                     item { OutlinedTextField(value = phone, onValueChange = { phone = it }, label = { Text("Phone") }, modifier = Modifier.fillMaxWidth()) }
                     item {
                         Text("Assign Ministry Role:", fontSize = 12.sp, color = CoolGrey)
-                        val roles = MinistryRole.entries.map { it.name }
+                        val roles = MinistryRoles.ALL_ROLES
                         androidx.compose.foundation.lazy.LazyRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                             items(roles) { r ->
-                                FilterChip(selected = role == r, onClick = { role = r }, label = { Text(r.replace("_", " "), fontSize = 11.sp) })
+                                FilterChip(
+                                    selected = role.equals(r, ignoreCase = true),
+                                    onClick = { role = r },
+                                    label = { Text(MinistryRoles.getDisplayName(r), fontSize = 11.sp) }
+                                )
                             }
                         }
                     }
@@ -210,15 +214,17 @@ fun UserManagementScreen(
             confirmButton = {
                 Button(
                     onClick = {
-                        if (fullName.isNotBlank() && email.isNotBlank() && username.isNotBlank() && initialPass.isNotBlank()) {
+                        if (fullName.isNotBlank() && email.isNotBlank() && initialPass.isNotBlank()) {
+                            val generatedUid = "uid_" + java.util.UUID.randomUUID().toString().replace("-", "").take(12)
                             viewModel.createUser(
                                 UserEntity(
-                                    fullName = fullName,
+                                    uid = generatedUid,
+                                    displayName = fullName,
                                     email = email,
-                                    username = username,
                                     passwordHash = "",
-                                    role = role,
+                                    role = role.lowercase(),
                                     phone = phone,
+                                    status = "active",
                                     mustChangePassword = true
                                 ),
                                 initialPass
@@ -246,14 +252,14 @@ fun UserManagementScreen(
                 Column {
                     Text("Select new role:", fontSize = 12.sp, color = CoolGrey)
                     Spacer(modifier = Modifier.height(8.dp))
-                    val roles = MinistryRole.entries.map { it.name }
+                    val roles = MinistryRoles.ALL_ROLES
                     roles.forEach { r ->
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
                         ) {
-                            RadioButton(selected = selectedRole == r, onClick = { selectedRole = r })
-                            Text(r.replace("_", " "), fontSize = 13.sp)
+                            RadioButton(selected = selectedRole.equals(r, ignoreCase = true), onClick = { selectedRole = r })
+                            Text(MinistryRoles.getDisplayName(r), fontSize = 13.sp)
                         }
                     }
                 }

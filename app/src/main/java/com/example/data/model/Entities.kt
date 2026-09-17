@@ -5,51 +5,105 @@ import androidx.room.PrimaryKey
 import java.security.MessageDigest
 
 object SecurityUtils {
-    private const val SALT = "YouthTransformers_Salt_2026"
+    private const val DEFAULT_SALT = "YouthTransformers_Salt_2026"
 
-    fun hashPassword(password: String): String {
-        val bytes = "$SALT:$password".toByteArray(Charsets.UTF_8)
-        val md = MessageDigest.getInstance("SHA-256")
-        val digest = md.digest(bytes)
-        return digest.fold("") { str, it -> str + "%02x".format(it) }
+    fun generateSalt(): String {
+        val bytes = ByteArray(16)
+        java.security.SecureRandom().nextBytes(bytes)
+        return bytes.joinToString("") { "%02x".format(it) }
     }
 
-    fun verifyPassword(password: String, storedHash: String): Boolean {
-        return hashPassword(password) == storedHash
+    fun hashPassword(password: String, salt: String = DEFAULT_SALT): String {
+        val bytes = "$salt:$password".toByteArray(Charsets.UTF_8)
+        val md = MessageDigest.getInstance("SHA-256")
+        val digest = md.digest(bytes)
+        return digest.joinToString("") { "%02x".format(it) }
+    }
+
+    fun verifyPassword(password: String, storedHash: String, salt: String = DEFAULT_SALT): Boolean {
+        return hashPassword(password, salt) == storedHash
+    }
+}
+
+object MinistryRoles {
+    const val LEADER = "leader"
+    const val COMMITTEE_COORDINATOR = "committee_coordinator"
+    const val LEVEL1_LEADER = "level1_leader"
+    const val SOCIAL_MEDIA = "social_media"
+    const val MEMBER_CARE = "member_care"
+    const val BIBLE_STUDY = "bible_study"
+    const val ACCOUNTANT = "accountant"
+    const val PROJECTS_MANAGER = "projects_manager"
+    const val MEMBER = "member"
+
+    val ALL_ROLES = listOf(
+        LEADER,
+        COMMITTEE_COORDINATOR,
+        LEVEL1_LEADER,
+        SOCIAL_MEDIA,
+        MEMBER_CARE,
+        BIBLE_STUDY,
+        ACCOUNTANT,
+        PROJECTS_MANAGER,
+        MEMBER
+    )
+
+    fun getDisplayName(role: String): String = when (role) {
+        LEADER -> "Ministry Leader"
+        COMMITTEE_COORDINATOR -> "Committee Coordinator"
+        LEVEL1_LEADER -> "Level 1 Leader"
+        SOCIAL_MEDIA -> "Social Media & Interaction"
+        MEMBER_CARE -> "Member Care"
+        BIBLE_STUDY -> "Bible Study Coordinator"
+        ACCOUNTANT -> "Accountant"
+        PROJECTS_MANAGER -> "Projects & Equipment Manager"
+        MEMBER -> "Ministry Member"
+        else -> role.replace("_", " ").replaceFirstChar { it.uppercase() }
     }
 }
 
 enum class MinistryRole(val title: String, val code: String) {
-    MINISTRY_LEADER("Ministry Leader", "LEADER"),
-    COMMITTEE_COORDINATOR("Committee Coordinator", "COORDINATOR"),
-    LEVEL_1_LEADER("Level 1 Leader", "LEVEL_1"),
-    SOCIAL_MEDIA("Social Media & Interaction", "MEDIA"),
-    MEMBER_CARE("Member Care", "CARE"),
-    BIBLE_STUDY_COORDINATOR("Bible Study Coordinator", "BIBLE"),
-    ACCOUNTANT("Accountant", "FINANCE"),
-    PROJECTS_EQUIPMENT_MANAGER("Projects & Equipment", "PROJECTS"),
-    MEMBER("Member", "MEMBER");
+    MINISTRY_LEADER("Ministry Leader", MinistryRoles.LEADER),
+    COMMITTEE_COORDINATOR("Committee Coordinator", MinistryRoles.COMMITTEE_COORDINATOR),
+    LEVEL_1_LEADER("Level 1 Leader", MinistryRoles.LEVEL1_LEADER),
+    SOCIAL_MEDIA("Social Media & Interaction", MinistryRoles.SOCIAL_MEDIA),
+    MEMBER_CARE("Member Care", MinistryRoles.MEMBER_CARE),
+    BIBLE_STUDY_COORDINATOR("Bible Study Coordinator", MinistryRoles.BIBLE_STUDY),
+    ACCOUNTANT("Accountant", MinistryRoles.ACCOUNTANT),
+    PROJECTS_EQUIPMENT_MANAGER("Projects & Equipment", MinistryRoles.PROJECTS_MANAGER),
+    MEMBER("Member", MinistryRoles.MEMBER);
 
     companion object {
         fun fromString(role: String): MinistryRole {
-            return entries.firstOrNull { it.name.equals(role, ignoreCase = true) || it.title.equals(role, ignoreCase = true) || it.code.equals(role, ignoreCase = true) } ?: MEMBER
+            return entries.firstOrNull {
+                it.code.equals(role, ignoreCase = true) ||
+                it.name.equals(role, ignoreCase = true) ||
+                it.title.equals(role, ignoreCase = true)
+            } ?: MEMBER
         }
     }
 }
 
 @Entity(tableName = "users")
 data class UserEntity(
-    @PrimaryKey(autoGenerate = true) val id: Long = 0,
-    val fullName: String,
+    @PrimaryKey val uid: String,
+    val displayName: String,
     val email: String,
-    val username: String,
-    val passwordHash: String,
-    val role: String,
+    val role: String, // leader, committee_coordinator, level1_leader, social_media, member_care, bible_study, accountant, projects_manager, member
+    val status: String = "active", // active, disabled
     val mustChangePassword: Boolean = false,
-    val isActive: Boolean = true,
+    val passwordHash: String,
+    val salt: String = "yt_default_salt",
     val phone: String = "",
-    val createdAt: Long = System.currentTimeMillis()
-)
+    val createdAt: Long = System.currentTimeMillis(),
+    val updatedAt: Long = System.currentTimeMillis(),
+    val lastLoginAt: Long = 0L
+) {
+    val id: Long get() = (uid.hashCode().toLong() and 0x7FFFFFFF)
+    val fullName: String get() = displayName
+    val username: String get() = email.substringBefore("@")
+    val isActive: Boolean get() = status == "active"
+}
 
 @Entity(tableName = "members")
 data class MemberEntity(
@@ -276,10 +330,16 @@ data class AnnouncementEntity(
 @Entity(tableName = "activity_logs")
 data class ActivityLogEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
-    val userName: String,
+    val actorUid: String,
+    val actorName: String,
     val action: String,
-    val objectType: String,
-    val dateStr: String,
+    val resourceType: String,
+    val resourceId: String = "",
     val details: String = "",
-    val timestamp: Long = System.currentTimeMillis()
-)
+    val timestamp: Long = System.currentTimeMillis(),
+    val result: String = "SUCCESS" // SUCCESS or ACCESS_DENIED
+) {
+    val userName: String get() = actorName
+    val objectType: String get() = resourceType
+    val dateStr: String get() = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.getDefault()).format(java.util.Date(timestamp))
+}

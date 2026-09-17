@@ -2,10 +2,8 @@ package com.example.ui.screens
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -15,8 +13,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -25,6 +21,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.R
+import com.example.data.model.MinistryRoles
 import com.example.data.model.UserEntity
 import com.example.ui.theme.*
 import com.example.ui.util.AppLanguage
@@ -43,6 +40,7 @@ fun LoginScreen(
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var showForgotPasswordDialog by remember { mutableStateOf(false) }
     var forgotEmailInput by remember { mutableStateOf("") }
+    var showReferenceRoster by remember { mutableStateOf(false) }
 
     LazyColumn(
         modifier = Modifier
@@ -123,7 +121,7 @@ fun LoginScreen(
                             identifier = it
                             errorMessage = null
                         },
-                        label = { Text("Email or Username") },
+                        label = { Text("Ministry Email") },
                         placeholder = { Text("e.g. hategekabenie@gmail.com") },
                         leadingIcon = {
                             Icon(Icons.Default.Email, contentDescription = null, tint = DeepForestGreen)
@@ -164,16 +162,17 @@ fun LoginScreen(
                         Text(
                             text = errorMessage ?: "",
                             color = MaterialTheme.colorScheme.error,
-                            fontSize = 12.sp
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium
                         )
                     }
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(18.dp))
 
                     Button(
                         onClick = {
                             if (identifier.isBlank() || password.isBlank()) {
-                                errorMessage = "Please enter both identifier and password."
+                                errorMessage = "Please enter both email and password."
                             } else {
                                 viewModel.login(identifier, password) { success, err ->
                                     if (!success) {
@@ -210,89 +209,98 @@ fun LoginScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
-            // Quick Role Switcher (One-Click Demo Access)
+            // Non-clickable Informational Reference Guide for Evaluators
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
                     .widthIn(max = 500.dp),
-                shape = RoundedCornerShape(16.dp),
+                shape = RoundedCornerShape(14.dp),
                 colors = CardDefaults.cardColors(containerColor = CleanWhite),
                 elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Default.Badge,
-                            contentDescription = null,
-                            tint = DeepForestGreen,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = MinistryStrings.t("quick_demo_login", currentLang),
-                            fontWeight = FontWeight.Bold,
-                            color = DarkCharcoal,
-                            fontSize = 14.sp
-                        )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.Info,
+                                contentDescription = null,
+                                tint = DeepForestGreen,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Registered Ministry Accounts",
+                                fontWeight = FontWeight.Bold,
+                                color = DarkCharcoal,
+                                fontSize = 13.sp
+                            )
+                        }
+                        TextButton(onClick = { showReferenceRoster = !showReferenceRoster }) {
+                            Text(
+                                text = if (showReferenceRoster) "Hide" else "Show Roster",
+                                fontSize = 12.sp,
+                                color = DeepForestGreen,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                     }
+
                     Text(
-                        text = MinistryStrings.t("switch_role_hint", currentLang),
+                        text = "Authentic credentials are required. Default setup password: Transform2026!",
                         fontSize = 11.sp,
                         color = CoolGrey,
-                        modifier = Modifier.padding(vertical = 4.dp)
+                        modifier = Modifier.padding(top = 2.dp)
                     )
-                    Spacer(modifier = Modifier.height(8.dp))
 
-                    users.forEach { user ->
-                        Surface(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 4.dp)
-                                .clickable { viewModel.quickSwitchUser(user) },
-                            shape = RoundedCornerShape(10.dp),
-                            color = SoftBackground,
-                            border = androidx.compose.foundation.BorderStroke(0.8.dp, BorderSubtle)
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(10.dp),
-                                verticalAlignment = Alignment.CenterVertically
+                    if (showReferenceRoster) {
+                        Spacer(modifier = Modifier.height(10.dp))
+                        users.forEach { user ->
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 3.dp),
+                                shape = RoundedCornerShape(8.dp),
+                                colors = CardDefaults.cardColors(containerColor = SoftBackground)
                             ) {
-                                Box(
+                                Row(
                                     modifier = Modifier
-                                        .size(32.dp)
-                                        .clip(CircleShape)
-                                        .background(SageContainer),
-                                    contentAlignment = Alignment.Center
+                                        .fillMaxWidth()
+                                        .padding(8.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Text(
-                                        text = user.fullName.take(2).uppercase(),
-                                        color = DeepForestGreen,
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 11.sp
-                                    )
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = user.displayName,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 12.sp,
+                                            color = DarkCharcoal
+                                        )
+                                        Text(
+                                            text = user.email,
+                                            fontSize = 11.sp,
+                                            color = CoolGrey
+                                        )
+                                    }
+                                    Surface(
+                                        shape = RoundedCornerShape(6.dp),
+                                        color = SageContainer
+                                    ) {
+                                        Text(
+                                            text = MinistryRoles.getDisplayName(user.role),
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = DeepForestGreen,
+                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                        )
+                                    }
                                 }
-                                Spacer(modifier = Modifier.width(10.dp))
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = user.fullName,
-                                        fontWeight = FontWeight.SemiBold,
-                                        fontSize = 13.sp,
-                                        color = DarkCharcoal
-                                    )
-                                    Text(
-                                        text = user.role.replace("_", " "),
-                                        fontSize = 11.sp,
-                                        color = SubtleGold
-                                    )
-                                }
-                                Icon(
-                                    imageVector = Icons.Default.ArrowForwardIos,
-                                    contentDescription = "Switch",
-                                    tint = CoolGrey,
-                                    modifier = Modifier.size(12.dp)
-                                )
                             }
                         }
                     }

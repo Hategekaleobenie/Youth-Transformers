@@ -19,8 +19,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.data.model.MinistryRole
+import com.example.data.model.MinistryRoles
 import com.example.data.model.UserEntity
+import com.example.security.AuthorizationService
+import com.example.security.Permission
 import com.example.ui.theme.*
 import com.example.ui.util.AppLanguage
 import com.example.ui.util.MinistryStrings
@@ -100,7 +102,7 @@ fun MinistryTopAppBar(
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = currentUser?.fullName?.take(2)?.uppercase() ?: "YT",
+                            text = currentUser?.displayName?.take(2)?.uppercase() ?: "YT",
                             color = Color.White,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold
@@ -116,14 +118,20 @@ fun MinistryTopAppBar(
                         text = {
                             Column {
                                 Text(
-                                    text = currentUser?.fullName ?: "User",
+                                    text = currentUser?.displayName ?: "User",
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 14.sp
                                 )
                                 Text(
-                                    text = currentUser?.role?.replace("_", " ") ?: "",
+                                    text = currentUser?.email ?: "",
                                     fontSize = 11.sp,
-                                    color = SubtleGold
+                                    color = CoolGrey
+                                )
+                                Text(
+                                    text = MinistryRoles.getDisplayName(currentUser?.role ?: "none"),
+                                    fontSize = 11.sp,
+                                    color = SubtleGold,
+                                    fontWeight = FontWeight.SemiBold
                                 )
                             }
                         },
@@ -236,7 +244,7 @@ fun StatusBadge(
         "active", "completed", "published", "approved", "resolved", "available" -> Pair(Color(0xFFE3F7EB), Color(0xFF0F6E3B))
         "follow-up required", "in progress", "in review", "borrowed", "planning", "medium" -> Pair(Color(0xFFFEF3D6), Color(0xFF8A5B00))
         "urgent", "high", "delayed", "missing", "damaged" -> Pair(Color(0xFFFDE8E8), Color(0xFFB81D1D))
-        "deactivated", "cancelled", "inactive" -> Pair(Color(0xFFEAEAEA), Color(0xFF5A5A5A))
+        "deactivated", "cancelled", "inactive", "disabled" -> Pair(Color(0xFFEAEAEA), Color(0xFF5A5A5A))
         else -> Pair(Color(0xFFEBF2F7), Color(0xFF2A527A))
     }
 
@@ -258,20 +266,16 @@ fun StatusBadge(
 @Composable
 fun NavDrawerContent(
     currentSection: MinistryNavSection,
-    userRole: String?,
+    currentUser: UserEntity?,
     currentLang: AppLanguage,
     onSelectSection: (MinistryNavSection) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val role = userRole?.let { MinistryRole.fromString(it) } ?: MinistryRole.MEMBER
-    val isLeader = role == MinistryRole.MINISTRY_LEADER
-    val isCoordinator = role == MinistryRole.COMMITTEE_COORDINATOR || isLeader
-
     ModalDrawerSheet(
         modifier = modifier.widthIn(max = 300.dp),
         drawerContainerColor = SoftBackground
     ) {
-        // Drawer Header
+        // Drawer Header with Authenticated Identity
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -295,36 +299,79 @@ fun NavDrawerContent(
                         letterSpacing = 0.5.sp
                     )
                 }
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(10.dp))
                 Text(
-                    text = MinistryStrings.t("app_tagline", currentLang),
+                    text = currentUser?.displayName ?: "Ministry Portal",
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp
+                )
+                Text(
+                    text = currentUser?.email ?: "",
                     color = SageContainer,
                     fontSize = 11.sp
                 )
+                Spacer(modifier = Modifier.height(4.dp))
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = Color.White.copy(alpha = 0.18f)
+                ) {
+                    Text(
+                        text = "Role: ${MinistryRoles.getDisplayName(currentUser?.role ?: "none")}",
+                        color = RadiantGold,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                    )
+                }
             }
         }
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        // Navigation Items
+        // Role-Based Navigation Items (strictly authorized views)
         val items = buildList {
             add(Pair(MinistryNavSection.DASHBOARD, Icons.Default.Dashboard))
-            add(Pair(MinistryNavSection.MEMBERS, Icons.Default.People))
-            add(Pair(MinistryNavSection.LEVEL_1, Icons.Default.School))
-            add(Pair(MinistryNavSection.BIBLE_STUDY, Icons.Default.MenuBook))
-            add(Pair(MinistryNavSection.ATTENDANCE, Icons.Default.CheckCircle))
-            add(Pair(MinistryNavSection.MEMBER_CARE, Icons.Default.Favorite))
-            add(Pair(MinistryNavSection.SOCIAL_MEDIA, Icons.Default.Share))
-            add(Pair(MinistryNavSection.FINANCE, Icons.Default.AttachMoney))
-            add(Pair(MinistryNavSection.PROJECTS, Icons.Default.Assignment))
-            add(Pair(MinistryNavSection.EQUIPMENT, Icons.Default.Inventory2))
-            add(Pair(MinistryNavSection.COMMITTEE, Icons.Default.Groups))
-            add(Pair(MinistryNavSection.REPORTS, Icons.Default.Description))
-            add(Pair(MinistryNavSection.EVANGELISM, Icons.Default.Public))
-            add(Pair(MinistryNavSection.EVENTS, Icons.Default.Event))
+            if (currentUser != null && AuthorizationService.isAuthorized(currentUser, Permission.VIEW_MEMBERS)) {
+                add(Pair(MinistryNavSection.MEMBERS, Icons.Default.People))
+            }
+            if (currentUser != null && AuthorizationService.isAuthorized(currentUser, Permission.ACCESS_LEVEL1_DASHBOARD)) {
+                add(Pair(MinistryNavSection.LEVEL_1, Icons.Default.School))
+            }
+            if (currentUser != null && AuthorizationService.isAuthorized(currentUser, Permission.ACCESS_BIBLE_STUDY_DASHBOARD)) {
+                add(Pair(MinistryNavSection.BIBLE_STUDY, Icons.Default.MenuBook))
+            }
+            if (currentUser != null && AuthorizationService.isAuthorized(currentUser, Permission.LOG_ATTENDANCE)) {
+                add(Pair(MinistryNavSection.ATTENDANCE, Icons.Default.CheckCircle))
+            }
+            if (currentUser != null && AuthorizationService.isAuthorized(currentUser, Permission.ACCESS_MEMBER_CARE_DASHBOARD)) {
+                add(Pair(MinistryNavSection.MEMBER_CARE, Icons.Default.Favorite))
+            }
+            if (currentUser != null && AuthorizationService.isAuthorized(currentUser, Permission.ACCESS_SOCIAL_MEDIA_DASHBOARD)) {
+                add(Pair(MinistryNavSection.SOCIAL_MEDIA, Icons.Default.Share))
+            }
+            if (currentUser != null && AuthorizationService.isAuthorized(currentUser, Permission.ACCESS_FINANCE_DASHBOARD)) {
+                add(Pair(MinistryNavSection.FINANCE, Icons.Default.AttachMoney))
+            }
+            if (currentUser != null && AuthorizationService.isAuthorized(currentUser, Permission.ACCESS_PROJECTS_DASHBOARD)) {
+                add(Pair(MinistryNavSection.PROJECTS, Icons.Default.Assignment))
+                add(Pair(MinistryNavSection.EQUIPMENT, Icons.Default.Inventory2))
+            }
+            if (currentUser != null && AuthorizationService.isAuthorized(currentUser, Permission.ACCESS_COMMITTEE_DASHBOARD)) {
+                add(Pair(MinistryNavSection.COMMITTEE, Icons.Default.Groups))
+                add(Pair(MinistryNavSection.REPORTS, Icons.Default.Description))
+            }
+            if (currentUser != null && AuthorizationService.isAuthorized(currentUser, Permission.LOG_EVANGELISM)) {
+                add(Pair(MinistryNavSection.EVANGELISM, Icons.Default.Public))
+            }
+            if (currentUser != null && AuthorizationService.isAuthorized(currentUser, Permission.MANAGE_EVENTS)) {
+                add(Pair(MinistryNavSection.EVENTS, Icons.Default.Event))
+            }
             add(Pair(MinistryNavSection.ANNOUNCEMENTS, Icons.Default.Campaign))
-            if (isLeader) {
+            if (currentUser != null && AuthorizationService.isAuthorized(currentUser, Permission.MANAGE_USERS)) {
                 add(Pair(MinistryNavSection.USERS, Icons.Default.ManageAccounts))
+            }
+            if (currentUser != null && AuthorizationService.isAuthorized(currentUser, Permission.VIEW_ACTIVITY_LOGS)) {
                 add(Pair(MinistryNavSection.ACTIVITY_LOG, Icons.Default.History))
             }
             add(Pair(MinistryNavSection.SETTINGS, Icons.Default.Settings))

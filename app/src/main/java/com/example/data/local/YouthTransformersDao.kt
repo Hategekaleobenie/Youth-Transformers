@@ -8,17 +8,20 @@ import kotlinx.coroutines.flow.Flow
 interface YouthTransformersDao {
 
     // Users
-    @Query("SELECT * FROM users ORDER BY fullName ASC")
+    @Query("SELECT * FROM users ORDER BY displayName ASC")
     fun getAllUsers(): Flow<List<UserEntity>>
 
-    @Query("SELECT * FROM users WHERE (email = :identifier OR username = :identifier) LIMIT 1")
-    suspend fun getUserByEmailOrUsername(identifier: String): UserEntity?
+    @Query("SELECT * FROM users WHERE email = :email LIMIT 1")
+    suspend fun getUserByEmail(email: String): UserEntity?
 
-    @Query("SELECT * FROM users WHERE id = :id LIMIT 1")
-    suspend fun getUserById(id: Long): UserEntity?
+    @Query("SELECT * FROM users WHERE (email = :identifier OR uid = :identifier) LIMIT 1")
+    suspend fun getUserByEmailOrUid(identifier: String): UserEntity?
+
+    @Query("SELECT * FROM users WHERE uid = :uid LIMIT 1")
+    suspend fun getUserByUid(uid: String): UserEntity?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertUser(user: UserEntity): Long
+    suspend fun insertUser(user: UserEntity)
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertUsers(users: List<UserEntity>)
@@ -26,14 +29,20 @@ interface YouthTransformersDao {
     @Update
     suspend fun updateUser(user: UserEntity)
 
-    @Query("UPDATE users SET passwordHash = :newHash, mustChangePassword = 0 WHERE id = :id")
-    suspend fun updatePassword(id: Long, newHash: String)
+    @Query("UPDATE users SET passwordHash = :newHash, salt = :salt, mustChangePassword = 0, updatedAt = :updatedAt WHERE uid = :uid")
+    suspend fun updatePassword(uid: String, newHash: String, salt: String, updatedAt: Long = System.currentTimeMillis())
 
-    @Query("UPDATE users SET isActive = :isActive WHERE id = :id")
-    suspend fun setUserActive(id: Long, isActive: Boolean)
+    @Query("UPDATE users SET status = :status, updatedAt = :updatedAt WHERE uid = :uid")
+    suspend fun setUserStatus(uid: String, status: String, updatedAt: Long = System.currentTimeMillis())
 
-    @Query("UPDATE users SET role = :role WHERE id = :id")
-    suspend fun updateUserRole(id: Long, role: String)
+    @Query("UPDATE users SET role = :role, updatedAt = :updatedAt WHERE uid = :uid")
+    suspend fun updateUserRole(uid: String, role: String, updatedAt: Long = System.currentTimeMillis())
+
+    @Query("UPDATE users SET lastLoginAt = :timestamp WHERE uid = :uid")
+    suspend fun updateLastLogin(uid: String, timestamp: Long)
+
+    @Query("DELETE FROM users WHERE uid = :uid")
+    suspend fun deleteUserByUid(uid: String)
 
     // Members
     @Query("SELECT * FROM members ORDER BY id DESC")
