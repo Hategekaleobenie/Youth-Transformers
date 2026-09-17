@@ -1,0 +1,6 @@
+{
+  "name": "Youth Transformers",
+  "description": "Ministry Management & Discipleship Platform for Youth Transformers",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
