@@ -1,0 +1,324 @@
+package com.example.util
+
+import android.content.Context
+import android.content.Intent
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.Typeface
+import android.graphics.pdf.PdfDocument
+import androidx.core.content.FileProvider
+import com.example.data.model.*
+import java.io.File
+import java.io.FileOutputStream
+import java.text.SimpleDateFormat
+import java.util.*
+
+object MinistryPdfGenerator {
+
+    private const val PAGE_WIDTH = 595 // Standard A4 points (72 dpi)
+    private const val PAGE_HEIGHT = 842
+    private const val MARGIN = 40f
+
+    /**
+     * Generates a Department Operational Report PDF and returns the File
+     */
+    fun generateDepartmentReportPdf(
+        context: Context,
+        report: CommitteeReportEntity
+    ): File {
+        val document = PdfDocument()
+        val pageInfo = PdfDocument.PageInfo.Builder(PAGE_WIDTH, PAGE_HEIGHT, 1).create()
+        val page = document.startPage(pageInfo)
+        val canvas: Canvas = page.canvas
+
+        val titlePaint = Paint().apply {
+            color = android.graphics.Color.rgb(15, 61, 46) // DeepForestGreen
+            textSize = 18f
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            isAntiAlias = true
+        }
+
+        val subtitlePaint = Paint().apply {
+            color = android.graphics.Color.rgb(197, 160, 89) // SubtleGold
+            textSize = 12f
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            isAntiAlias = true
+        }
+
+        val headerLabelPaint = Paint().apply {
+            color = android.graphics.Color.rgb(26, 38, 57)
+            textSize = 11f
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            isAntiAlias = true
+        }
+
+        val bodyPaint = Paint().apply {
+            color = android.graphics.Color.rgb(40, 50, 60)
+            textSize = 10f
+            typeface = Typeface.DEFAULT
+            isAntiAlias = true
+        }
+
+        val mutedPaint = Paint().apply {
+            color = android.graphics.Color.rgb(110, 120, 130)
+            textSize = 9f
+            typeface = Typeface.DEFAULT
+            isAntiAlias = true
+        }
+
+        val linePaint = Paint().apply {
+            color = android.graphics.Color.rgb(220, 225, 230)
+            strokeWidth = 1f
+        }
+
+        val bannerPaint = Paint().apply {
+            color = android.graphics.Color.rgb(238, 245, 240) // SageContainer
+            style = Paint.Style.FILL
+        }
+
+        var y = MARGIN + 10f
+
+        // Top decorative banner
+        canvas.drawRoundRect(MARGIN, y, PAGE_WIDTH - MARGIN, y + 65f, 8f, 8f, bannerPaint)
+        canvas.drawText("YOUTH TRANSFORMERS MINISTRY", MARGIN + 16f, y + 26f, titlePaint)
+        canvas.drawText("Official Operational Progress Report", MARGIN + 16f, y + 46f, subtitlePaint)
+        y += 85f
+
+        // Report Meta Table
+        canvas.drawText("DEPARTMENT / TYPE:", MARGIN, y, headerLabelPaint)
+        canvas.drawText(report.reportType, MARGIN + 140f, y, bodyPaint)
+        y += 18f
+
+        canvas.drawText("SUBMITTED BY:", MARGIN, y, headerLabelPaint)
+        canvas.drawText("${report.authorName} (${report.authorRole})", MARGIN + 140f, y, bodyPaint)
+        y += 18f
+
+        canvas.drawText("DATE OF SUBMISSION:", MARGIN, y, headerLabelPaint)
+        canvas.drawText(report.dateStr, MARGIN + 140f, y, bodyPaint)
+        y += 18f
+
+        canvas.drawText("REPORT STATUS:", MARGIN, y, headerLabelPaint)
+        canvas.drawText(report.status, MARGIN + 140f, y, subtitlePaint)
+        y += 24f
+
+        canvas.drawLine(MARGIN, y, PAGE_WIDTH - MARGIN, y, linePaint)
+        y += 20f
+
+        // 6-Point Structure
+        val sections = listOf(
+            "1. ACCOMPLISHMENTS & KEY DELIVERABLES" to report.accomplished,
+            "2. CURRENT OPERATIONAL WORK IN PROGRESS" to report.currentWork,
+            "3. CHALLENGES & BOTTLENECKS ENCOUNTERED" to report.challenges.ifBlank { "None reported." },
+            "4. SUPPORT & RESOURCES REQUIRED" to report.supportNeeded.ifBlank { "No special assistance requested." },
+            "5. IMMEDIATE NEXT STEPS & TARGETS" to report.nextSteps.ifBlank { "Continuing standard agenda." },
+            "6. PASTORAL, PRAYER & SPIRITUAL NOTES" to report.prayerNotes.ifBlank { "Prayers appreciated for ministry reach." }
+        )
+
+        for ((heading, content) in sections) {
+            canvas.drawText(heading, MARGIN, y, headerLabelPaint)
+            y += 16f
+
+            // Multi-line wrap
+            val lines = splitIntoLines(content, 85)
+            for (line in lines) {
+                canvas.drawText(line, MARGIN + 10f, y, bodyPaint)
+                y += 14f
+            }
+            y += 10f
+        }
+
+        // Footer
+        canvas.drawLine(MARGIN, PAGE_HEIGHT - 50f, PAGE_WIDTH - MARGIN, PAGE_HEIGHT - 50f, linePaint)
+        val dateNow = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date())
+        canvas.drawText("Generated by Youth Transformers Leader Center • Confidential Ministry Record", MARGIN, PAGE_HEIGHT - 35f, mutedPaint)
+        canvas.drawText("Timestamp: $dateNow", MARGIN, PAGE_HEIGHT - 22f, mutedPaint)
+
+        document.finishPage(page)
+
+        val outputDir = File(context.cacheDir, "reports")
+        if (!outputDir.exists()) outputDir.mkdirs()
+        val safeName = report.reportType.replace(" ", "_").replace("/", "_").lowercase()
+        val file = File(outputDir, "${safeName}_report_${System.currentTimeMillis()}.pdf")
+
+        FileOutputStream(file).use { out ->
+            document.writeTo(out)
+        }
+        document.close()
+        return file
+    }
+
+    /**
+     * Generates an Executive Ministry Health Summary PDF for the Leader
+     */
+    fun generateExecutiveSummaryPdf(
+        context: Context,
+        totalMembers: Int,
+        activeMembers: Int,
+        followUpNeeded: Int,
+        activeProjectsCount: Int,
+        treasuryBalance: Double,
+        publishedMediaCount: Int,
+        recentAnnouncements: Int,
+        usersCount: Int
+    ): File {
+        val document = PdfDocument()
+        val pageInfo = PdfDocument.PageInfo.Builder(PAGE_WIDTH, PAGE_HEIGHT, 1).create()
+        val page = document.startPage(pageInfo)
+        val canvas: Canvas = page.canvas
+
+        val titlePaint = Paint().apply {
+            color = android.graphics.Color.rgb(15, 61, 46)
+            textSize = 20f
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            isAntiAlias = true
+        }
+
+        val subtitlePaint = Paint().apply {
+            color = android.graphics.Color.rgb(197, 160, 89)
+            textSize = 12f
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            isAntiAlias = true
+        }
+
+        val headerPaint = Paint().apply {
+            color = android.graphics.Color.rgb(26, 38, 57)
+            textSize = 13f
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            isAntiAlias = true
+        }
+
+        val bodyPaint = Paint().apply {
+            color = android.graphics.Color.rgb(40, 50, 60)
+            textSize = 11f
+            typeface = Typeface.DEFAULT
+            isAntiAlias = true
+        }
+
+        val linePaint = Paint().apply {
+            color = android.graphics.Color.rgb(210, 215, 220)
+            strokeWidth = 1f
+        }
+
+        val bannerPaint = Paint().apply {
+            color = android.graphics.Color.rgb(238, 245, 240)
+            style = Paint.Style.FILL
+        }
+
+        var y = MARGIN + 10f
+
+        canvas.drawRoundRect(MARGIN, y, PAGE_WIDTH - MARGIN, y + 75f, 8f, 8f, bannerPaint)
+        canvas.drawText("YOUTH TRANSFORMERS MINISTRY", MARGIN + 16f, y + 30f, titlePaint)
+        canvas.drawText("Executive Ministry Health & Administration Briefing", MARGIN + 16f, y + 52f, subtitlePaint)
+        y += 95f
+
+        canvas.drawText("MINISTRY ADMINISTRATIVE KPI SUMMARY", MARGIN, y, headerPaint)
+        y += 20f
+
+        val metrics = listOf(
+            "Registered System Accounts" to "$usersCount authorized users",
+            "Total Congregation / Members" to "$totalMembers registered souls",
+            "Active Engaged Members" to "$activeMembers active souls",
+            "Follow-up & Pastoral Care Cases" to "$followUpNeeded members needing attention",
+            "Active Infrastructure Projects" to "$activeProjectsCount projects progressing",
+            "Treasury Balance" to "${String.format("%,.0f", treasuryBalance)} RWF",
+            "Gospel Social Media Reach" to "$publishedMediaCount weekly publications",
+            "Recent Ministry Bulletins" to "$recentAnnouncements published announcements"
+        )
+
+        for ((key, value) in metrics) {
+            canvas.drawText(key, MARGIN + 10f, y, bodyPaint)
+            canvas.drawText(value, MARGIN + 260f, y, headerPaint)
+            y += 20f
+            canvas.drawLine(MARGIN + 10f, y - 6f, PAGE_WIDTH - MARGIN - 10f, y - 6f, linePaint)
+        }
+
+        y += 30f
+        canvas.drawText("EXECUTIVE GOVERNANCE MANDATE", MARGIN, y, headerPaint)
+        y += 18f
+        val statement = "Youth Transformers operates under strict role-based governance and pastoral stewardship. " +
+                "This document summarizes real-time database records and operational activities compiled under the authority " +
+                "of Leader Leo Benie Hategeka. All departmental workflows are audited through the continuous activity log."
+        val lines = splitIntoLines(statement, 80)
+        for (l in lines) {
+            canvas.drawText(l, MARGIN + 10f, y, bodyPaint)
+            y += 16f
+        }
+
+        // Footer
+        val mutedPaint = Paint().apply {
+            color = android.graphics.Color.rgb(120, 130, 140)
+            textSize = 9f
+            isAntiAlias = true
+        }
+        val dateNow = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date())
+        canvas.drawLine(MARGIN, PAGE_HEIGHT - 50f, PAGE_WIDTH - MARGIN, PAGE_HEIGHT - 50f, linePaint)
+        canvas.drawText("Generated by Youth Transformers Executive Center • Leader Leo Benie Hategeka", MARGIN, PAGE_HEIGHT - 35f, mutedPaint)
+        canvas.drawText("Generated on: $dateNow • Confidential", MARGIN, PAGE_HEIGHT - 22f, mutedPaint)
+
+        document.finishPage(page)
+
+        val outputDir = File(context.cacheDir, "reports")
+        if (!outputDir.exists()) outputDir.mkdirs()
+        val file = File(outputDir, "executive_ministry_summary_${System.currentTimeMillis()}.pdf")
+
+        FileOutputStream(file).use { out ->
+            document.writeTo(out)
+        }
+        document.close()
+        return file
+    }
+
+    /**
+     * Shares or opens the PDF via Android Intent
+     */
+    fun openOrSharePdf(context: Context, file: File, title: String) {
+        val uri = FileProvider.getUriForFile(
+            context,
+            "${context.packageName}.provider",
+            file
+        )
+        val intent = Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(uri, "application/pdf")
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+
+        val chooser = Intent.createChooser(intent, "Open or Share $title").apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        try {
+            context.startActivity(chooser)
+        } catch (e: Exception) {
+            // Fallback to SEND intent if no PDF viewer
+            val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                type = "application/pdf"
+                putExtra(Intent.EXTRA_STREAM, uri)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(Intent.createChooser(shareIntent, "Share $title").apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            })
+        }
+    }
+
+    private fun splitIntoLines(text: String, maxChars: Int): List<String> {
+        val words = text.split(" ")
+        val lines = mutableListOf<String>()
+        var currentLine = StringBuilder()
+
+        for (word in words) {
+            if (currentLine.length + word.length + 1 > maxChars) {
+                lines.add(currentLine.toString())
+                currentLine = StringBuilder(word)
+            } else {
+                if (currentLine.isNotEmpty()) currentLine.append(" ")
+                currentLine.append(word)
+            }
+        }
+        if (currentLine.isNotEmpty()) {
+            lines.add(currentLine.toString())
+        }
+        return lines
+    }
+}

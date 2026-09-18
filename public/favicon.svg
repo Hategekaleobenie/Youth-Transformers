@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <linearGradient id="greenGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0B5D3B" />
+      <stop offset="100%" stop-color="#073B25" />
+    </linearGradient>
+    <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FEF3C7" />
+      <stop offset="50%" stop-color="#D4A72C" />
+      <stop offset="100%" stop-color="#9A7513" />
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="128" fill="url(#greenGrad)" />
+  <circle cx="256" cy="256" r="210" fill="none" stroke="#D4A72C" stroke-width="6" stroke-dasharray="8 6" opacity="0.6"/>
+  <!-- Cross and rays -->
+  <g transform="translate(256, 256)">
+    <!-- Aura Rays -->
+    <path d="M-90,-70 Q0,-140 90,-70 Q0,-100 -90,-70 Z" fill="#16A34A" opacity="0.7"/>
+    <path d="M-130,0 Q-80,-60 0,-90 Q-40,-20 -130,0 Z" fill="#D4A72C" opacity="0.5"/>
+    <path d="M130,0 Q80,-60 0,-90 Q40,-20 130,0 Z" fill="#D4A72C" opacity="0.5"/>
+    <!-- Solid Golden Cross -->
+    <rect x="-18" y="-120" width="36" height="240" rx="8" fill="url(#goldGrad)" />
+    <rect x="-80" y="-60" width="160" height="36" rx="8" fill="url(#goldGrad)" />
+    <!-- Center Jewel -->
+    <circle cx="0" cy="-42" r="14" fill="#FFFFFF" opacity="0.9"/>
+  </g>
+  <!-- Text ring abbreviation -->
+  <text x="256" y="440" text-anchor="middle" font-family="Inter, sans-serif" font-weight="800" font-size="34" fill="#FEF3C7" letter-spacing="4">YOUTH TRANSFORMERS</text>
+</svg>
