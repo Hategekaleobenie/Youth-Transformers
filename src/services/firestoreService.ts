@@ -34,7 +34,24 @@ const K_NOTIFS = 'yt_notifs_data';
 function getLocal<I>(key: string, initial: I[]): I[] {
   try {
     const raw = localStorage.getItem(key);
-    if (raw) return JSON.parse(raw);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (key === K_USERS && Array.isArray(parsed)) {
+        // Guarantee all canonical seed users exist
+        let changed = false;
+        for (const seedItem of initial as any[]) {
+          const exists = parsed.some((p: any) => p.email?.toLowerCase() === seedItem.email?.toLowerCase() || p.uid === seedItem.uid);
+          if (!exists) {
+            parsed.push(seedItem);
+            changed = true;
+          }
+        }
+        if (changed) {
+          localStorage.setItem(key, JSON.stringify(parsed));
+        }
+      }
+      return parsed;
+    }
   } catch (e) {}
   localStorage.setItem(key, JSON.stringify(initial));
   return initial;
@@ -560,10 +577,22 @@ export const SEED_USERS: T.UserProfile[] = [
     assignedPermissions: ['level1:manage', 'members:view']
   },
   {
+    uid: 'usr_livia_kirezi',
+    email: 'livia@youthtransformers.org',
+    displayName: 'Livia Kirezi',
+    phone: '+250 788 000 004',
+    role: 'social_media',
+    department: 'Social Media & Digital Gospel',
+    status: 'active',
+    createdAt: now - 1000 * 60 * 60 * 24 * 150,
+    lastLoginAt: now - 1000 * 60 * 180,
+    assignedPermissions: ['social_media:manage', 'announcements:create']
+  },
+  {
     uid: 'usr_kellia_mwizerwa',
     email: 'kellia@youthtransformers.org',
     displayName: 'Kellia Mwizerwa',
-    phone: '+250 788 000 004',
+    phone: '+250 788 000 009',
     role: 'social_media',
     department: 'Social Media & Digital Gospel',
     status: 'active',

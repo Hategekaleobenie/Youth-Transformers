@@ -29,7 +29,7 @@ export async function logActivity(entry: Omit<ActivityLogItem, 'id' | 'timestamp
   // Local persistent audit log fallback for development/offline
   try {
     const raw = localStorage.getItem(LOCAL_STORAGE_KEY);
-    const list: ActivityLogItem[] = raw ? JSON.parse(raw) : [];
+    const list: ActivityLogItem[] = raw ? JSON.parse(raw) : getInitialSeedActivityLogs();
     list.unshift(fullEntry); // newest first
     if (list.length > 500) list.pop();
     localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(list));

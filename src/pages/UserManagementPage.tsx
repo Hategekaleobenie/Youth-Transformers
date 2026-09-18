@@ -11,7 +11,9 @@ import {
   UserCheck,
   Check,
   X,
-  AlertTriangle
+  AlertTriangle,
+  KeyRound,
+  CheckCircle2
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { getUsers, saveUser, updateUserStatus } from '../services/firestoreService';
@@ -19,12 +21,13 @@ import { logActivity } from '../services/activityLogService';
 import { UserProfile, MinistryRole, AccountStatus } from '../types';
 
 export const UserManagementPage: React.FC = () => {
-  const { currentUser } = useAuth();
+  const { currentUser, sendResetEmail } = useAuth();
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [loading, setLoading] = useState(true);
+  const [resetFeedback, setResetFeedback] = useState<{ email: string; message: string } | null>(null);
 
   // Edit / Add Modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -152,6 +155,29 @@ export const UserManagementPage: React.FC = () => {
     await loadUsers();
   };
 
+  const handleInitiatePasswordReset = async (user: UserProfile) => {
+    if (!currentUser) return;
+    const ok = await sendResetEmail(user.email);
+    if (ok) {
+      setResetFeedback({
+        email: user.email,
+        message: `Password reset email sent to ${user.email}.`
+      });
+      await logActivity({
+        actorUid: currentUser.uid,
+        actorName: currentUser.displayName,
+        actorRole: currentUser.role,
+        action: 'Password Reset Initiated',
+        module: 'users',
+        resourceType: 'user',
+        resourceId: user.uid,
+        details: `Administrator initiated password reset email for ${user.displayName} (${user.email})`,
+        result: 'success'
+      });
+      setTimeout(() => setResetFeedback(null), 5000);
+    }
+  };
+
   const filteredUsers = users.filter((u) => {
     const matchesSearch =
       u.displayName.toLowerCase().includes(search.toLowerCase()) ||
@@ -235,6 +261,19 @@ export const UserManagementPage: React.FC = () => {
         </div>
       </div>
 
+      {/* Reset Feedback Notification */}
+      {resetFeedback && (
+        <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center justify-between gap-2 text-xs text-emerald-800">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span>{resetFeedback.message}</span>
+          </div>
+          <button onClick={() => setResetFeedback(null)} className="text-emerald-700 hover:text-emerald-950 font-bold text-xs">
+            Dismiss
+          </button>
+        </div>
+      )}
+
       {/* Table */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
         <div className="overflow-x-auto">
@@ -290,6 +329,14 @@ export const UserManagementPage: React.FC = () => {
                     </td>
                     <td className="px-5 py-3.5 text-right">
                       <div className="flex items-center justify-end gap-1.5">
+                        <button
+                          onClick={() => handleInitiatePasswordReset(u)}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-amber-600 hover:bg-amber-50 transition"
+                          title="Send Password Reset Email"
+                        >
+                          <KeyRound className="w-4 h-4" />
+                        </button>
+
                         <button
                           onClick={() => handleOpenEdit(u)}
                           className="p-1.5 rounded-lg text-slate-600 hover:text-ministry-deepGreen hover:bg-slate-100 transition"

@@ -92,7 +92,7 @@ export const CommitteePage: React.FC = () => {
             Committee Coordination & Deliverables
           </h2>
           <p className="text-xs text-slate-500 mt-1">
-            Coordinated by Yvette Neema • Executive assignments, deliverables, and operational accountability
+            Coordinated by Green London • Executive assignments, deliverables, and operational accountability
           </p>
         </div>
 

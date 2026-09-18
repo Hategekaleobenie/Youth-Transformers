@@ -60,7 +60,7 @@ export const Level1Page: React.FC = () => {
             Level 1 Discipleship Academy
           </h2>
           <p className="text-xs text-slate-500 mt-1">
-            Department led by Shema Prince • Foundational doctrinal training and spiritual nurture
+            Department led by Bonheur Ndinzwe • Foundational doctrinal training and spiritual nurture
           </p>
         </div>
 

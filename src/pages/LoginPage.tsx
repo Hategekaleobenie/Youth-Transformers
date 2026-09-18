@@ -156,7 +156,7 @@ export const LoginPage: React.FC = () => {
           )}
 
           {/* Security Governance Notice */}
-          <div className="mt-6 pt-5 border-t border-slate-100 flex items-center justify-center gap-2 text-[11px] text-slate-500">
+          <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-center gap-2 text-xs text-slate-500">
             <ShieldCheck className="w-4 h-4 text-ministry-emerald" />
             <span>Protected by Role-Based Access Control</span>
           </div>

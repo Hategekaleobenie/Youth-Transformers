@@ -73,7 +73,7 @@ export const SocialMediaPage: React.FC = () => {
             Digital Evangelism & Social Media
           </h2>
           <p className="text-xs text-slate-500 mt-1">
-            Department managed by Kenny Hirwa Ruzindana • Reaching nations through Christ-centered digital media
+            Department managed by Livia Kirezi • Reaching nations through Christ-centered digital media
           </p>
         </div>
 

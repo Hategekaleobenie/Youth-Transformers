@@ -2,7 +2,9 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper functions for real server-side authorization
+    // =========================================================================
+    // ROLE & STATUS HELPER FUNCTIONS
+    // =========================================================================
     function isAuthenticated() {
       return request.auth != null;
     }
@@ -15,66 +17,118 @@ service cloud.firestore {
       return isAuthenticated() && getUserData().status == 'active';
     }
 
-    function hasRole(roleName) {
-      return isActiveUser() && (getUserData().role == roleName || getUserData().role == 'leader');
-    }
-
     function isLeader() {
       return isActiveUser() && getUserData().role == 'leader';
     }
 
-    // 1. Users collection
-    // - Each user can read their own profile
-    // - Only Leader can create/update/deactivate users
+    function hasRole(roleName) {
+      return isActiveUser() && (getUserData().role == roleName || getUserData().role == 'leader');
+    }
+
+    function hasAnyRole(rolesList) {
+      return isActiveUser() && (getUserData().role in rolesList || getUserData().role == 'leader');
+    }
+
+    // =========================================================================
+    // 1. USERS, ROLES & PERMISSIONS
+    // =========================================================================
+    // Users Collection:
+    // - Each user can read their own profile; Leader can read all profiles
+    // - Only Leader can create/delete user profiles or modify role/status/permissions
+    // - A user cannot change their own role, status, or assignedPermissions
     match /users/{userId} {
       allow read: if isAuthenticated() && (request.auth.uid == userId || isLeader());
       allow create, update, delete: if isLeader();
     }
 
-    // 2. Members collection
-    // - Leader & Member Care can write
-    // - Authorized leadership roles can read
-    match /members/{memberId} {
-      allow read: if isActiveUser() && (
-        getUserData().role in ['leader', 'member_care', 'level1_leader', 'bible_study']
-      );
-      allow create, update: if hasRole('member_care');
-      allow delete: if isLeader(); // Only leader can permanently delete
+    // Roles and Permissions Registry
+    match /roles/{roleId} {
+      allow read: if isAuthenticated();
+      allow write: if isLeader();
+    }
+    match /permissions/{permissionId} {
+      allow read: if isAuthenticated();
+      allow write: if isLeader();
     }
 
-    // 3. Pastoral Member Care & Follow-up Cases
+    // =========================================================================
+    // 2. MEMBERS & MEMBER ASSIGNMENTS
+    // =========================================================================
+    // Disciples and ministry members database
+    match /members/{memberId} {
+      allow read: if hasAnyRole(['member_care', 'level1_leader', 'bible_study', 'committee_coordinator']);
+      allow create, update: if hasRole('member_care');
+      allow delete: if isLeader();
+    }
+    match /memberAssignments/{assignmentId} {
+      allow read: if hasAnyRole(['member_care', 'level1_leader', 'committee_coordinator']);
+      allow write: if hasRole('member_care');
+    }
+
+    // =========================================================================
+    // 3. PASTORAL MEMBER CARE, FOLLOW-UPS & SUPPORT CASES
+    // =========================================================================
+    // Pastoral care records strictly restricted to Member Care & Leader
+    match /followUps/{caseId} {
+      allow read, write: if hasRole('member_care');
+    }
     match /followUpCases/{caseId} {
       allow read, write: if hasRole('member_care');
     }
+    match /supportCases/{caseId} {
+      allow read, write: if hasRole('member_care');
+    }
 
-    // 4. Discipleship & Level 1 Records
+    // =========================================================================
+    // 4. LEVEL 1 DISCIPLESHIP
+    // =========================================================================
     match /discipleshipRecords/{recordId} {
       allow read: if isActiveUser();
       allow write: if hasRole('level1_leader');
     }
     match /progressionRecommendations/{recId} {
-      allow read: if hasRole('level1_leader');
-      allow write: if hasRole('level1_leader');
+      allow read, write: if hasRole('level1_leader');
     }
 
-    // 5. Bible Study & Attendance
+    // =========================================================================
+    // 5. BIBLE STUDY & ATTENDANCE
+    // =========================================================================
     match /bibleStudies/{studyId} {
       allow read: if isActiveUser();
       allow write: if hasRole('bible_study');
     }
-    match /attendanceRecords/{attendanceId} {
+    match /bibleStudyAttendance/{attendanceId} {
       allow read: if isActiveUser();
       allow write: if hasRole('bible_study');
     }
+    match /attendance/{attendanceId} {
+      allow read: if isActiveUser();
+      allow write: if hasAnyRole(['bible_study', 'level1_leader']);
+    }
+    match /attendanceRecords/{recordId} {
+      allow read: if isActiveUser();
+      allow write: if hasAnyRole(['bible_study', 'level1_leader']);
+    }
 
-    // 6. Finances & Treasury
-    // - Strictly restricted to Accountant and Leader
+    // =========================================================================
+    // 6. FINANCE & TREASURY
+    // =========================================================================
+    // Normal members and non-accountants CANNOT access Finance
     match /financialTransactions/{txId} {
       allow read, write: if hasRole('accountant');
     }
+    match /budgets/{budgetId} {
+      allow read, write: if hasRole('accountant');
+    }
 
-    // 7. Projects & Equipment
+    // =========================================================================
+    // 7. PROJECTS & EQUIPMENT
+    // =========================================================================
     match /projects/{projectId} {
+      allow read: if isActiveUser();
+      allow write: if hasRole('projects_manager');
+    }
+    match /projectTasks/{taskId} {
       allow read: if isActiveUser();
       allow write: if hasRole('projects_manager');
     }
@@ -82,8 +136,22 @@ service cloud.firestore {
       allow read: if isActiveUser();
       allow write: if hasRole('projects_manager');
     }
+    match /equipmentTransactions/{transactionId} {
+      allow read: if isActiveUser();
+      allow write: if hasRole('projects_manager');
+    }
 
-    // 8. Committee Tasks & Reports
+    // =========================================================================
+    // 8. COMMITTEE GOVERNANCE, TASKS & ASSIGNMENTS
+    // =========================================================================
+    match /committee_assignments/{assignmentId} {
+      allow read: if isActiveUser();
+      allow write: if hasRole('committee_coordinator');
+    }
+    match /tasks/{taskId} {
+      allow read: if isActiveUser();
+      allow write: if hasAnyRole(['committee_coordinator', 'projects_manager']);
+    }
     match /committeeTasks/{taskId} {
       allow read: if isActiveUser();
       allow write: if hasRole('committee_coordinator');
@@ -93,7 +161,25 @@ service cloud.firestore {
       allow write: if hasRole('committee_coordinator');
     }
 
-    // 9. Social Media & Content Calendar
+    // =========================================================================
+    // 9. REPORTS
+    // =========================================================================
+    match /reports/{reportId} {
+      allow read: if isActiveUser();
+      allow write: if hasAnyRole([
+        'committee_coordinator',
+        'accountant',
+        'bible_study',
+        'member_care',
+        'level1_leader',
+        'projects_manager',
+        'social_media'
+      ]);
+    }
+
+    // =========================================================================
+    // 10. SOCIAL MEDIA & DIGITAL OUTREACH
+    // =========================================================================
     match /socialPosts/{postId} {
       allow read: if isActiveUser();
       allow write: if hasRole('social_media');
@@ -102,25 +188,53 @@ service cloud.firestore {
       allow read, write: if hasRole('social_media') || hasRole('member_care');
     }
 
-    // 10. Evangelism & Events
+    // =========================================================================
+    // 11. EVANGELISM & EVENTS
+    // =========================================================================
+    match /evangelismEvents/{eventId} {
+      allow read: if isActiveUser();
+      allow write: if hasAnyRole(['social_media', 'level1_leader', 'bible_study', 'committee_coordinator']);
+    }
     match /evangelismRecords/{recordId} {
       allow read: if isActiveUser();
-      allow write: if isActiveUser() && (getUserData().role in ['leader', 'level1_leader', 'bible_study', 'committee_coordinator']);
+      allow write: if hasAnyRole(['social_media', 'level1_leader', 'bible_study', 'committee_coordinator']);
+    }
+    match /events/{eventId} {
+      allow read: if isActiveUser();
+      allow write: if hasAnyRole(['committee_coordinator', 'projects_manager']);
     }
     match /ministryEvents/{eventId} {
       allow read: if isActiveUser();
-      allow write: if hasRole('committee_coordinator') || hasRole('projects_manager');
+      allow write: if hasAnyRole(['committee_coordinator', 'projects_manager']);
     }
 
-    // 11. Announcements
+    // =========================================================================
+    // 12. ANNOUNCEMENTS
+    // =========================================================================
     match /announcements/{announcementId} {
       allow read: if isAuthenticated();
-      allow write: if hasRole('committee_coordinator') || hasRole('social_media');
+      allow write: if hasAnyRole(['committee_coordinator', 'social_media']);
     }
 
-    // 12. Activity Audit Log
-    // - Append-only by authenticated operations
-    // - Only Leader can view activity logs
+    // =========================================================================
+    // 13. NOTIFICATIONS & SYSTEM SETTINGS
+    // =========================================================================
+    match /notifications/{notifId} {
+      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isLeader());
+      allow create: if isAuthenticated();
+      allow update, delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+    }
+    match /settings/{settingId} {
+      allow read: if isAuthenticated();
+      allow write: if isLeader();
+    }
+
+    // =========================================================================
+    // 14. ACTIVITY AUDIT LOGS
+    // =========================================================================
+    // - Append-only by authenticated sessions
+    // - Strictly immutable: CANNOT be updated or deleted by ordinary users or admins
+    // - Only Leader can read the security logs
     match /activityLogs/{logId} {
       allow read: if isLeader();
       allow create: if isAuthenticated();

@@ -147,7 +147,7 @@ export const ProjectsEquipmentPage: React.FC = () => {
             Projects & Physical Asset Stewardship
           </h2>
           <p className="text-xs text-slate-500 mt-1">
-            Department managed by Samuel Ndayambaje • Infrastructure initiatives, media gear, and capital assets
+            Department managed by Rene Cyubahiro • Infrastructure initiatives, media gear, and capital assets
           </p>
         </div>
 

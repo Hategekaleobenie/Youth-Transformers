@@ -1,9 +1,34 @@
 import React, { useState, useEffect } from 'react';
-import { FileText, Download, Plus, CheckCircle2, Clock, X, AlertCircle } from 'lucide-react';
+import {
+  FileText,
+  Download,
+  Plus,
+  CheckCircle2,
+  Clock,
+  X,
+  AlertCircle,
+  ShieldCheck,
+  BookOpen,
+  DollarSign,
+  HeartHandshake,
+  Share2,
+  Briefcase,
+  Users,
+  ClipboardList
+} from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { getReports, saveReport, getMembers, getFinanceTransactions, getProjects } from '../services/firestoreService';
 import { logActivity } from '../services/activityLogService';
-import { generateOfficialMinistryPDF } from '../services/pdfService';
+import {
+  generateOfficialMinistryPDF,
+  downloadBibleStudyReportPDF,
+  downloadFinanceReportPDF,
+  downloadMemberCareReportPDF,
+  downloadSocialMediaReportPDF,
+  downloadProjectReportPDF,
+  downloadAttendanceReportPDF,
+  downloadCommitteeReportPDF
+} from '../services/pdfService';
 import { CommitteeReport } from '../types';
 
 export const ReportsPage: React.FC = () => {
@@ -11,6 +36,7 @@ export const ReportsPage: React.FC = () => {
   const [reports, setReports] = useState<CommitteeReport[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [generatingPdfId, setGeneratingPdfId] = useState<string | null>(null);
+  const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const [formData, setFormData] = useState({
     title: '',
@@ -33,6 +59,97 @@ export const ReportsPage: React.FC = () => {
     const data = await getReports();
     setReports(data);
   };
+
+  const handleDownloadDepartmentPDF = async (
+    deptKey: string,
+    deptName: string,
+    generator: () => Promise<void>
+  ) => {
+    if (!currentUser) return;
+    setStatusMessage(null);
+    setGeneratingPdfId(deptKey);
+
+    try {
+      await generator();
+      setStatusMessage({
+        type: 'success',
+        text: `Official ${deptName} PDF Report generated from live database records and downloaded successfully. Verification record logged.`
+      });
+    } catch (err: any) {
+      setStatusMessage({
+        type: 'error',
+        text: err.message || `Access Denied: You do not have authorization to download the ${deptName} Report.`
+      });
+    } finally {
+      setGeneratingPdfId(null);
+    }
+  };
+
+  const DEPARTMENT_REPORTS = [
+    {
+      id: 'bible_study_pdf',
+      name: 'Bible Study Ministry Report',
+      dept: 'Bible Study & Spiritual Growth',
+      icon: BookOpen,
+      authorizedRoles: ['bible_study', 'leader'],
+      desc: 'Doctrinal syllabus, weekly participation numbers, topic highlights, and spiritual growth audits.',
+      action: () => downloadBibleStudyReportPDF(currentUser!)
+    },
+    {
+      id: 'finance_pdf',
+      name: 'Finance & Treasury Audit Report',
+      dept: 'Finance & Treasury',
+      icon: DollarSign,
+      authorizedRoles: ['accountant', 'leader'],
+      desc: 'Verified inflows, expenditures, category balances, net treasury assets, and certified transaction ledger.',
+      action: () => downloadFinanceReportPDF(currentUser!)
+    },
+    {
+      id: 'member_care_pdf',
+      name: 'Member Care Pastoral Report',
+      dept: 'Pastoral Member Care & Welfare',
+      icon: HeartHandshake,
+      authorizedRoles: ['member_care', 'leader'],
+      desc: 'Pastoral follow-up cases, prayer counseling requests, urgent visitation records, and welfare initiatives.',
+      action: () => downloadMemberCareReportPDF(currentUser!)
+    },
+    {
+      id: 'social_media_pdf',
+      name: 'Social Media Outreach Report',
+      dept: 'Digital Evangelism & Social Media',
+      icon: Share2,
+      authorizedRoles: ['social_media', 'leader'],
+      desc: 'Digital gospel broadcasts, platform reach (Instagram, TikTok, YouTube), engagement statistics, and publication status.',
+      action: () => downloadSocialMediaReportPDF(currentUser!)
+    },
+    {
+      id: 'projects_pdf',
+      name: 'Capital Projects & Asset Report',
+      dept: 'Projects & Equipment Maintenance',
+      icon: Briefcase,
+      authorizedRoles: ['projects_manager', 'leader'],
+      desc: 'Infrastructure projects, budget vs expenditure, physical inventory registry, and equipment custodian logs.',
+      action: () => downloadProjectReportPDF(currentUser!)
+    },
+    {
+      id: 'attendance_pdf',
+      name: 'Fellowship Attendance Audit Report',
+      dept: 'Discipleship & Attendance Oversight',
+      icon: Users,
+      authorizedRoles: ['bible_study', 'level1_leader', 'leader'],
+      desc: 'Weekly service attendance trends, expected vs actual disciples present, and discipleship retention metrics.',
+      action: () => downloadAttendanceReportPDF(currentUser!)
+    },
+    {
+      id: 'committee_pdf',
+      name: 'Executive Committee Report',
+      dept: 'Committee Coordination & Deliverables',
+      icon: ClipboardList,
+      authorizedRoles: ['committee_coordinator', 'leader'],
+      desc: 'Executive assignment tracking, departmental deliverables, quarterly milestones, and governance accountability.',
+      action: () => downloadCommitteeReportPDF(currentUser!)
+    }
+  ];
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -71,12 +188,11 @@ export const ReportsPage: React.FC = () => {
     await loadReports();
   };
 
-  const handleDownloadPDF = async (rep: CommitteeReport) => {
+  const handleDownloadCustomPDF = async (rep: CommitteeReport) => {
     if (!currentUser) return;
     setGeneratingPdfId(rep.id);
 
     try {
-      // Gather live statistics from database for inclusion in report
       const [members, txs, projs] = await Promise.all([
         getMembers(),
         getFinanceTransactions(),
@@ -107,8 +223,16 @@ export const ReportsPage: React.FC = () => {
         details: `Generated official document for: ${rep.title}`,
         result: 'success'
       });
-    } catch (err) {
+      setStatusMessage({
+        type: 'success',
+        text: `Official PDF for "${rep.title}" successfully generated and downloaded.`
+      });
+    } catch (err: any) {
       console.error('PDF error:', err);
+      setStatusMessage({
+        type: 'error',
+        text: err.message || 'Failed to generate PDF.'
+      });
     } finally {
       setGeneratingPdfId(null);
     }
@@ -122,7 +246,7 @@ export const ReportsPage: React.FC = () => {
             Official Ministry Reports & Publications
           </h2>
           <p className="text-xs text-slate-500 mt-1">
-            Departmental accountability, weekly reviews, and verified PDF executive summaries
+            Real-time departmental PDF generation, official audit trails, and executive governance summaries
           </p>
         </div>
 
@@ -135,49 +259,152 @@ export const ReportsPage: React.FC = () => {
         </button>
       </div>
 
-      {/* Reports List */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {reports.map((rep) => (
-          <div key={rep.id} className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs flex flex-col justify-between">
-            <div>
-              <div className="flex items-start justify-between gap-2 mb-2">
-                <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 uppercase">
-                  {rep.department}
-                </span>
-                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                  rep.status === 'approved' ? 'bg-emerald-100 text-emerald-800' : 'bg-blue-100 text-blue-800'
-                }`}>
-                  {rep.status.toUpperCase()}
-                </span>
-              </div>
-
-              <h3 className="font-bold text-sm text-slate-900 mb-1">{rep.title}</h3>
-              <p className="text-xs text-slate-500 mb-3">
-                Period: <strong>{rep.reportingPeriod}</strong> • Submitted: {rep.dateSubmitted}
-              </p>
-
-              <div className="p-3 bg-slate-50 rounded-xl text-slate-700 text-xs border border-slate-100 mb-3">
-                <strong className="block text-slate-900 mb-1 text-[11px] uppercase tracking-wider">
-                  Executive Summary
-                </strong>
-                <p className="leading-relaxed line-clamp-3">{rep.executiveSummary}</p>
-              </div>
-            </div>
-
-            <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
-              <span className="text-slate-400">By: {rep.submittedByName}</span>
-
-              <button
-                onClick={() => handleDownloadPDF(rep)}
-                disabled={generatingPdfId === rep.id}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-ministry-deepGreen hover:bg-ministry-forestDark text-white font-bold rounded-xl text-xs shadow-xs transition disabled:opacity-50"
-              >
-                <Download className="w-3.5 h-3.5" />
-                <span>{generatingPdfId === rep.id ? 'Generating...' : 'Download Official PDF'}</span>
-              </button>
-            </div>
+      {/* Status Notifications */}
+      {statusMessage && (
+        <div
+          className={`p-4 rounded-2xl flex items-start gap-3 text-xs border animate-fade-in ${
+            statusMessage.type === 'success'
+              ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
+              : 'bg-rose-50 border-rose-200 text-rose-900'
+          }`}
+        >
+          {statusMessage.type === 'success' ? (
+            <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+          ) : (
+            <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+          )}
+          <div className="flex-1">
+            <span className="font-bold block mb-0.5">
+              {statusMessage.type === 'success' ? 'Report Export Successful' : 'Access Verification Failure'}
+            </span>
+            <span>{statusMessage.text}</span>
           </div>
-        ))}
+          <button
+            onClick={() => setStatusMessage(null)}
+            className="text-slate-400 hover:text-slate-600 text-xs font-bold"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
+      {/* 7 Official Real-Time Department Reports Station */}
+      <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-xs">
+        <div className="flex items-center gap-2 mb-2">
+          <ShieldCheck className="w-5 h-5 text-ministry-emerald" />
+          <h3 className="text-sm font-black text-slate-900 uppercase tracking-wide">
+            Real-Time Authorized Department PDF Reports
+          </h3>
+        </div>
+        <p className="text-xs text-slate-500 mb-5">
+          Each report queries current database collections and generates an official, verified ministry document.
+          Access is enforced by Role-Based Access Control and all attempts are logged in the Security Audit Log.
+        </p>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {DEPARTMENT_REPORTS.map((r) => {
+            const Icon = r.icon;
+            const isAuthorized = currentUser ? r.authorizedRoles.includes(currentUser.role) : false;
+            const isBusy = generatingPdfId === r.id;
+
+            return (
+              <div
+                key={r.id}
+                className="bg-slate-50 rounded-2xl border border-slate-200 p-4.5 flex flex-col justify-between hover:border-slate-300 transition"
+              >
+                <div>
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <div className="w-9 h-9 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-ministry-deepGreen shadow-2xs">
+                      <Icon className="w-4 h-4" />
+                    </div>
+                    <span
+                      className={`text-[9px] font-bold px-2 py-0.5 rounded-full uppercase ${
+                        isAuthorized
+                          ? 'bg-emerald-100 text-emerald-800'
+                          : 'bg-slate-200 text-slate-600'
+                      }`}
+                    >
+                      {isAuthorized ? 'Authorized' : 'Restricted'}
+                    </span>
+                  </div>
+
+                  <h4 className="font-bold text-xs text-slate-900 mb-1">{r.name}</h4>
+                  <span className="block text-[10px] text-ministry-emerald font-semibold mb-2">
+                    {r.dept}
+                  </span>
+                  <p className="text-[11px] text-slate-500 leading-relaxed mb-4">
+                    {r.desc}
+                  </p>
+                </div>
+
+                <div className="pt-3 border-t border-slate-200/60">
+                  <button
+                    onClick={() => handleDownloadDepartmentPDF(r.id, r.name, r.action)}
+                    disabled={isBusy}
+                    className={`w-full py-2 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 shadow-2xs ${
+                      isAuthorized
+                        ? 'bg-ministry-deepGreen hover:bg-ministry-forestDark text-white'
+                        : 'bg-slate-200 hover:bg-rose-100 hover:text-rose-800 text-slate-700'
+                    }`}
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>{isBusy ? 'Compiling PDF...' : 'Download Official PDF'}</span>
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Submitted Departmental Progress Reports */}
+      <div className="pt-2">
+        <h3 className="text-sm font-black text-slate-900 uppercase tracking-wide mb-3">
+          Submitted Departmental Progress Reports
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {reports.map((rep) => (
+            <div key={rep.id} className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs flex flex-col justify-between">
+              <div>
+                <div className="flex items-start justify-between gap-2 mb-2">
+                  <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 uppercase">
+                    {rep.department}
+                  </span>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                    rep.status === 'approved' ? 'bg-emerald-100 text-emerald-800' : 'bg-blue-100 text-blue-800'
+                  }`}>
+                    {rep.status.toUpperCase()}
+                  </span>
+                </div>
+
+                <h3 className="font-bold text-sm text-slate-900 mb-1">{rep.title}</h3>
+                <p className="text-xs text-slate-500 mb-3">
+                  Period: <strong>{rep.reportingPeriod}</strong> • Submitted: {rep.dateSubmitted}
+                </p>
+
+                <div className="p-3 bg-slate-50 rounded-xl text-slate-700 text-xs border border-slate-100 mb-3">
+                  <strong className="block text-slate-900 mb-1 text-[11px] uppercase tracking-wider">
+                    Executive Summary
+                  </strong>
+                  <p className="leading-relaxed line-clamp-3">{rep.executiveSummary}</p>
+                </div>
+              </div>
+
+              <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
+                <span className="text-slate-400">By: {rep.submittedByName}</span>
+
+                <button
+                  onClick={() => handleDownloadCustomPDF(rep)}
+                  disabled={generatingPdfId === rep.id}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-ministry-deepGreen hover:bg-ministry-forestDark text-white font-bold rounded-xl text-xs shadow-xs transition disabled:opacity-50"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>{generatingPdfId === rep.id ? 'Generating...' : 'Download PDF'}</span>
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Modal */}
@@ -219,7 +446,6 @@ export const ReportsPage: React.FC = () => {
                     className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-ministry-emerald"
                   />
                 </div>
-
                 <div>
                   <label className="block font-bold text-slate-700 uppercase tracking-wider mb-1">
                     Reporting Period
@@ -229,7 +455,6 @@ export const ReportsPage: React.FC = () => {
                     required
                     value={formData.reportingPeriod}
                     onChange={(e) => setFormData({ ...formData, reportingPeriod: e.target.value })}
-                    placeholder="e.g. September 2026"
                     className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-ministry-emerald"
                   />
                 </div>
@@ -240,25 +465,24 @@ export const ReportsPage: React.FC = () => {
                   Executive Summary *
                 </label>
                 <textarea
-                  rows={3}
                   required
+                  rows={3}
                   value={formData.executiveSummary}
                   onChange={(e) => setFormData({ ...formData, executiveSummary: e.target.value })}
-                  placeholder="Concise overview of accomplishments, spiritual atmosphere, and operational health..."
+                  placeholder="High-level overview of ministry impact and accomplishments..."
                   className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-ministry-emerald"
                 />
               </div>
 
               <div>
                 <label className="block font-bold text-slate-700 uppercase tracking-wider mb-1">
-                  Activities Completed
+                  Key Activities Completed
                 </label>
                 <textarea
                   rows={2}
-                  required
                   value={formData.activitiesCompleted}
                   onChange={(e) => setFormData({ ...formData, activitiesCompleted: e.target.value })}
-                  placeholder="Key milestones completed during this period..."
+                  placeholder="Bullet points or summary of initiatives executed..."
                   className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-ministry-emerald"
                 />
               </div>
@@ -266,44 +490,43 @@ export const ReportsPage: React.FC = () => {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block font-bold text-slate-700 uppercase tracking-wider mb-1">
-                    Challenges / Blockers
+                    Operational Challenges
                   </label>
                   <textarea
                     rows={2}
                     value={formData.challenges}
                     onChange={(e) => setFormData({ ...formData, challenges: e.target.value })}
-                    placeholder="Obstacles encountered..."
+                    placeholder="Hindrances or areas needing prayer & resource support..."
                     className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-ministry-emerald"
                   />
                 </div>
-
                 <div>
                   <label className="block font-bold text-slate-700 uppercase tracking-wider mb-1">
-                    Next Steps / Recommendations
+                    Strategic Next Steps
                   </label>
                   <textarea
                     rows={2}
                     value={formData.nextSteps}
                     onChange={(e) => setFormData({ ...formData, nextSteps: e.target.value })}
-                    placeholder="Action plan for coming cycle..."
+                    placeholder="Milestones slated for next reporting interval..."
                     className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-ministry-emerald"
                   />
                 </div>
               </div>
 
-              <div className="pt-3 flex justify-end gap-2 border-t border-slate-100">
+              <div className="pt-4 border-t border-slate-100 flex items-center justify-end gap-3">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 font-medium text-slate-600 hover:bg-slate-100 rounded-xl"
+                  className="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 font-semibold"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-ministry-deepGreen hover:bg-ministry-forestDark text-white font-bold rounded-xl shadow-xs"
+                  className="px-5 py-2 bg-ministry-deepGreen hover:bg-ministry-forestDark text-white font-bold rounded-xl shadow-xs transition"
                 >
-                  Submit Report
+                  Submit Official Report
                 </button>
               </div>
             </form>
