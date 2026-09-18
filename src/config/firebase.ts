@@ -3,35 +3,30 @@ import { getAuth, Auth } from 'firebase/auth';
 import { getFirestore, Firestore } from 'firebase/firestore';
 import { getStorage, FirebaseStorage } from 'firebase/storage';
 
+// Firebase Web App configuration.
+// Web Firebase config values are intended to be included in client-side builds.
+// Environment variables can still override these values when supplied.
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "",
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "",
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "",
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "",
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "",
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || ""
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyDPoE4myxgYGL89rgJpwqyDYuGAZRUO6Y0",
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "youth-transformers-database.firebaseapp.com",
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "youth-transformers-database",
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "youth-transformers-database.firebasestorage.app",
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "738366925914",
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:738366925914:web:684d7c1f786180a791bc63"
 };
 
 export const isFirebaseConfigured = Boolean(
-  import.meta.env.VITE_FIREBASE_API_KEY &&
-  import.meta.env.VITE_FIREBASE_PROJECT_ID
+  firebaseConfig.apiKey &&
+  firebaseConfig.authDomain &&
+  firebaseConfig.projectId &&
+  firebaseConfig.appId
 );
 
 let app: FirebaseApp;
 if (getApps().length) {
   app = getApp();
-} else if (isFirebaseConfigured) {
-  app = initializeApp(firebaseConfig);
 } else {
-  // Standalone fallback initialization to avoid runtime crash when .env is pending
-  app = initializeApp({
-    apiKey: "pending_env_configuration",
-    authDomain: "pending_env_configuration.firebaseapp.com",
-    projectId: "pending_env_configuration",
-    storageBucket: "pending_env_configuration.appspot.com",
-    messagingSenderId: "000000000000",
-    appId: "1:000000000000:web:000000000000"
-  });
+  app = initializeApp(firebaseConfig);
 }
 
 export const auth: Auth = getAuth(app);
