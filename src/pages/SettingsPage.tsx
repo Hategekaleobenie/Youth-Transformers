@@ -111,13 +111,13 @@ export const SettingsPage: React.FC = () => {
                   ? 'bg-emerald-100 text-emerald-800'
                   : 'bg-amber-100 text-amber-800'
               }`}>
-                {isFirebaseConfigured ? 'LIVE FIREBASE ACTIVE' : 'DEV MODE (LOCAL PERSISTENCE)'}
+                {isFirebaseConfigured ? 'LIVE FIREBASE CONNECTED' : 'DEV MODE (LOCAL PERSISTENCE)'}
               </span>
             </div>
             <p className="text-xs text-slate-600 mt-2 leading-relaxed">
               {isFirebaseConfigured
-                ? 'Connected to Firebase Authentication and Cloud Firestore. Role-based security rules actively enforced.'
-                : 'Running in development mode with seeded ministry records and local persistence. To deploy live to production, set your Firebase credentials in environment variables or hosting configuration.'}
+                ? 'Connected to Firebase Authentication and Cloud Firestore. This application does not silently fall back to local ministry data.'
+                : 'Firebase is not configured. Local persistence is disabled for production. Configure Firebase before using the ministry system.'}
             </p>
           </div>
         </div>
