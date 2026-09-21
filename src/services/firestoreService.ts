@@ -72,7 +72,7 @@ export async function getUsers(): Promise<T.UserProfile[]> {
         return snap.docs.map(d => ({ uid: d.id, ...d.data() } as T.UserProfile));
       }
     } catch (e) {
-      console.warn('Firestore getUsers error:', e);
+      throw e;
     }
   }
   return getLocal<T.UserProfile>(K_USERS, SEED_USERS);
@@ -86,7 +86,7 @@ export async function getUserById(uid: string): Promise<T.UserProfile | null> {
         return { uid: snap.id, ...snap.data() } as T.UserProfile;
       }
     } catch (e) {
-      console.warn('Firestore getUserById error:', e);
+      throw e;
     }
   }
   const all = await getUsers();
@@ -99,7 +99,7 @@ export async function saveUser(user: T.UserProfile): Promise<void> {
       await setDoc(doc(db, 'users', user.uid), user);
       return;
     } catch (e) {
-      console.warn('Firestore saveUser error:', e);
+      throw e;
     }
   }
   const all = await getUsers();
@@ -115,7 +115,7 @@ export async function updateUserStatus(uid: string, status: T.AccountStatus): Pr
       await updateDoc(doc(db, 'users', uid), { status });
       return;
     } catch (e) {
-      console.warn('Firestore updateUserStatus error:', e);
+      throw e;
     }
   }
   const all = await getUsers();
@@ -135,7 +135,7 @@ export async function getMembers(): Promise<T.Member[]> {
         return snap.docs.map(d => ({ id: d.id, ...d.data() } as T.Member));
       }
     } catch (e) {
-      console.warn('Firestore getMembers error:', e);
+      throw e;
     }
   }
   return getLocal<T.Member>(K_MEMBERS, SEED_MEMBERS);
@@ -147,7 +147,7 @@ export async function saveMember(member: T.Member): Promise<void> {
       await setDoc(doc(db, 'members', member.id), member);
       return;
     } catch (e) {
-      console.warn('Firestore saveMember error:', e);
+      throw e;
     }
   }
   const all = await getMembers();
@@ -166,7 +166,7 @@ export async function getFollowUpCases(): Promise<T.FollowUpCase[]> {
         return snap.docs.map(d => ({ id: d.id, ...d.data() } as T.FollowUpCase));
       }
     } catch (e) {
-      console.warn('Firestore getFollowUpCases error:', e);
+      throw e;
     }
   }
   return getLocal<T.FollowUpCase>(K_CASES, SEED_CASES);
@@ -178,7 +178,7 @@ export async function saveFollowUpCase(item: T.FollowUpCase): Promise<void> {
       await setDoc(doc(db, 'followUpCases', item.id), item);
       return;
     } catch (e) {
-      console.warn('Firestore saveFollowUpCase error:', e);
+      throw e;
     }
   }
   const all = await getFollowUpCases();
@@ -197,7 +197,7 @@ export async function getBibleStudies(): Promise<T.BibleStudy[]> {
         return snap.docs.map(d => ({ id: d.id, ...d.data() } as T.BibleStudy));
       }
     } catch (e) {
-      console.warn('Firestore getBibleStudies error:', e);
+      throw e;
     }
   }
   return getLocal<T.BibleStudy>(K_BIBLE, SEED_BIBLE);
@@ -209,7 +209,7 @@ export async function saveBibleStudy(study: T.BibleStudy): Promise<void> {
       await setDoc(doc(db, 'bibleStudies', study.id), study);
       return;
     } catch (e) {
-      console.warn('Firestore saveBibleStudy error:', e);
+      throw e;
     }
   }
   const all = await getBibleStudies();
@@ -228,7 +228,7 @@ export async function getAttendance(): Promise<T.AttendanceRecord[]> {
         return snap.docs.map(d => ({ id: d.id, ...d.data() } as T.AttendanceRecord));
       }
     } catch (e) {
-      console.warn('Firestore getAttendance error:', e);
+      throw e;
     }
   }
   return getLocal<T.AttendanceRecord>(K_ATTENDANCE, SEED_ATTENDANCE);
@@ -240,7 +240,7 @@ export async function saveAttendance(rec: T.AttendanceRecord): Promise<void> {
       await setDoc(doc(db, 'attendanceRecords', rec.id), rec);
       return;
     } catch (e) {
-      console.warn('Firestore saveAttendance error:', e);
+      throw e;
     }
   }
   const all = await getAttendance();
@@ -257,7 +257,7 @@ export async function getFinanceTransactions(): Promise<T.FinancialTransaction[]
         return snap.docs.map(d => ({ id: d.id, ...d.data() } as T.FinancialTransaction));
       }
     } catch (e) {
-      console.warn('Firestore getFinance error:', e);
+      throw e;
     }
   }
   return getLocal<T.FinancialTransaction>(K_FINANCE, SEED_FINANCE);
@@ -269,7 +269,7 @@ export async function saveFinanceTransaction(tx: T.FinancialTransaction): Promis
       await setDoc(doc(db, 'financialTransactions', tx.id), tx);
       return;
     } catch (e) {
-      console.warn('Firestore saveFinance error:', e);
+      throw e;
     }
   }
   const all = await getFinanceTransactions();
@@ -286,7 +286,7 @@ export async function getProjects(): Promise<T.Project[]> {
         return snap.docs.map(d => ({ id: d.id, ...d.data() } as T.Project));
       }
     } catch (e) {
-      console.warn('Firestore getProjects error:', e);
+      throw e;
     }
   }
   return getLocal<T.Project>(K_PROJECTS, SEED_PROJECTS);
@@ -298,7 +298,7 @@ export async function saveProject(proj: T.Project): Promise<void> {
       await setDoc(doc(db, 'projects', proj.id), proj);
       return;
     } catch (e) {
-      console.warn('Firestore saveProject error:', e);
+      throw e;
     }
   }
   const all = await getProjects();
@@ -316,7 +316,7 @@ export async function getEquipment(): Promise<T.EquipmentItem[]> {
         return snap.docs.map(d => ({ id: d.id, ...d.data() } as T.EquipmentItem));
       }
     } catch (e) {
-      console.warn('Firestore getEquipment error:', e);
+      throw e;
     }
   }
   return getLocal<T.EquipmentItem>(K_EQUIPMENT, SEED_EQUIPMENT);
@@ -328,7 +328,7 @@ export async function saveEquipment(item: T.EquipmentItem): Promise<void> {
       await setDoc(doc(db, 'equipment', item.id), item);
       return;
     } catch (e) {
-      console.warn('Firestore saveEquipment error:', e);
+      throw e;
     }
   }
   const all = await getEquipment();
@@ -347,7 +347,7 @@ export async function getSocialPosts(): Promise<T.SocialPost[]> {
         return snap.docs.map(d => ({ id: d.id, ...d.data() } as T.SocialPost));
       }
     } catch (e) {
-      console.warn('Firestore getSocialPosts error:', e);
+      throw e;
     }
   }
   return getLocal<T.SocialPost>(K_SOCIAL, SEED_SOCIAL);
@@ -359,7 +359,7 @@ export async function saveSocialPost(post: T.SocialPost): Promise<void> {
       await setDoc(doc(db, 'socialPosts', post.id), post);
       return;
     } catch (e) {
-      console.warn('Firestore saveSocialPost error:', e);
+      throw e;
     }
   }
   const all = await getSocialPosts();
@@ -378,7 +378,7 @@ export async function getEvangelismRecords(): Promise<T.EvangelismRecord[]> {
         return snap.docs.map(d => ({ id: d.id, ...d.data() } as T.EvangelismRecord));
       }
     } catch (e) {
-      console.warn('Firestore getEvangelism error:', e);
+      throw e;
     }
   }
   return getLocal<T.EvangelismRecord>(K_EVANGELISM, SEED_EVANGELISM);
@@ -390,7 +390,7 @@ export async function saveEvangelismRecord(rec: T.EvangelismRecord): Promise<voi
       await setDoc(doc(db, 'evangelismRecords', rec.id), rec);
       return;
     } catch (e) {
-      console.warn('Firestore saveEvangelism error:', e);
+      throw e;
     }
   }
   const all = await getEvangelismRecords();
@@ -406,7 +406,7 @@ export async function getMinistryEvents(): Promise<T.MinistryEvent[]> {
         return snap.docs.map(d => ({ id: d.id, ...d.data() } as T.MinistryEvent));
       }
     } catch (e) {
-      console.warn('Firestore getMinistryEvents error:', e);
+      throw e;
     }
   }
   return getLocal<T.MinistryEvent>(K_EVENTS, SEED_EVENTS);
@@ -418,7 +418,7 @@ export async function saveMinistryEvent(ev: T.MinistryEvent): Promise<void> {
       await setDoc(doc(db, 'ministryEvents', ev.id), ev);
       return;
     } catch (e) {
-      console.warn('Firestore saveMinistryEvent error:', e);
+      throw e;
     }
   }
   const all = await getMinistryEvents();
@@ -437,7 +437,7 @@ export async function getReports(): Promise<T.CommitteeReport[]> {
         return snap.docs.map(d => ({ id: d.id, ...d.data() } as T.CommitteeReport));
       }
     } catch (e) {
-      console.warn('Firestore getReports error:', e);
+      throw e;
     }
   }
   return getLocal<T.CommitteeReport>(K_REPORTS, SEED_REPORTS);
@@ -449,7 +449,7 @@ export async function saveReport(report: T.CommitteeReport): Promise<void> {
       await setDoc(doc(db, 'committeeReports', report.id), report);
       return;
     } catch (e) {
-      console.warn('Firestore saveReport error:', e);
+      throw e;
     }
   }
   const all = await getReports();
@@ -468,7 +468,7 @@ export async function getCommitteeTasks(): Promise<T.CommitteeTask[]> {
         return snap.docs.map(d => ({ id: d.id, ...d.data() } as T.CommitteeTask));
       }
     } catch (e) {
-      console.warn('Firestore getCommitteeTasks error:', e);
+      throw e;
     }
   }
   return getLocal<T.CommitteeTask>(K_COMMITTEE_TASKS, SEED_COMMITTEE_TASKS);
@@ -480,7 +480,7 @@ export async function saveCommitteeTask(task: T.CommitteeTask): Promise<void> {
       await setDoc(doc(db, 'committeeTasks', task.id), task);
       return;
     } catch (e) {
-      console.warn('Firestore saveCommitteeTask error:', e);
+      throw e;
     }
   }
   const all = await getCommitteeTasks();
@@ -499,7 +499,7 @@ export async function getAnnouncements(): Promise<T.Announcement[]> {
         return snap.docs.map(d => ({ id: d.id, ...d.data() } as T.Announcement));
       }
     } catch (e) {
-      console.warn('Firestore getAnnouncements error:', e);
+      throw e;
     }
   }
   return getLocal<T.Announcement>(K_ANNOUNCEMENTS, SEED_ANNOUNCEMENTS);
@@ -511,7 +511,7 @@ export async function saveAnnouncement(item: T.Announcement): Promise<void> {
       await setDoc(doc(db, 'announcements', item.id), item);
       return;
     } catch (e) {
-      console.warn('Firestore saveAnnouncement error:', e);
+      throw e;
     }
   }
   const all = await getAnnouncements();
