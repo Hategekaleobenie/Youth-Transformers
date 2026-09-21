@@ -75,20 +75,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 setError(null);
               }
             } else {
-              // Firebase auth user exists but no Firestore profile yet
-              const newProfile: UserProfile = {
-                uid: fbUser.uid,
-                email: fbUser.email || '',
-                displayName: fbUser.displayName || fbUser.email?.split('@')[0] || 'Ministry User',
-                phone: '',
-                role: 'member',
-                department: 'Youth Ministry',
-                status: 'active',
-                createdAt: Date.now(),
-                lastLoginAt: Date.now()
-              };
-              await saveUser(newProfile);
-              setCurrentUser(newProfile);
+              // Never auto-provision an authenticated user into the ministry.
+              // A Firebase Auth account must have an explicitly created Firestore
+              // ministry profile before it can access the application.
+              await firebaseSignOut(auth);
+              setCurrentUser(null);
+              setError('Your Firebase account is valid, but no Youth Transformers ministry profile is assigned to it. Ask the leader to create/assign your ministry profile.');
             }
           } catch (err: any) {
             console.error('Error fetching user profile:', err);
@@ -137,6 +129,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           await firebaseSignOut(auth);
           setCurrentUser(null);
           setError(t('auth.disabledAccount'));
+          setLoading(false);
+          return false;
+        }
+
+        if (!profile) {
+          await firebaseSignOut(auth);
+          setCurrentUser(null);
+          setError('Your Firebase account exists, but your Youth Transformers ministry profile is missing. Ask the leader to create/assign your profile.');
           setLoading(false);
           return false;
         }
