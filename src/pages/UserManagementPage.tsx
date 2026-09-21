@@ -33,6 +33,7 @@ export const UserManagementPage: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
   const [formData, setFormData] = useState({
+    firebaseUid: '',
     displayName: '',
     email: '',
     phone: '',
@@ -59,6 +60,7 @@ export const UserManagementPage: React.FC = () => {
   const handleOpenAdd = () => {
     setEditingUser(null);
     setFormData({
+      firebaseUid: '',
       displayName: '',
       email: '',
       phone: '',
@@ -73,6 +75,7 @@ export const UserManagementPage: React.FC = () => {
   const handleOpenEdit = (user: UserProfile) => {
     setEditingUser(user);
     setFormData({
+      firebaseUid: user.uid,
       displayName: user.displayName,
       email: user.email,
       phone: user.phone || '',
@@ -107,11 +110,22 @@ export const UserManagementPage: React.FC = () => {
         result: 'success'
       });
     } else {
-      // Create new user record
-      const newUid = `usr_${Date.now()}`;
+      // A Firestore ministry profile must use the real Firebase Authentication UID.
+      // Never invent a local UID here: Firestore rules bind access to request.auth.uid.
+      const newUid = formData.firebaseUid.trim();
+      if (!newUid) {
+        throw new Error('Enter the real Firebase Authentication UID for this account.');
+      }
+
       const newUser: UserProfile = {
         uid: newUid,
-        ...formData,
+        displayName: formData.displayName,
+        email: formData.email,
+        phone: formData.phone,
+        role: formData.role,
+        department: formData.department,
+        status: formData.status,
+        assignedPermissions: formData.assignedPermissions,
         createdAt: Date.now(),
         lastLoginAt: Date.now(),
         mustChangePassword: true
@@ -389,6 +403,26 @@ export const UserManagementPage: React.FC = () => {
             <form onSubmit={handleSave} className="p-6 space-y-4 text-xs">
               <div>
                 <label className="block font-bold text-slate-700 uppercase tracking-wider mb-1">
+                  Firebase Authentication UID
+                </label>
+                <input
+                  type="text"
+                  required={!editingUser}
+                  disabled={Boolean(editingUser)}
+                  value={formData.firebaseUid}
+                  onChange={(e) => setFormData({ ...formData, firebaseUid: e.target.value.trim() })}
+                  placeholder="Paste the UID from Firebase Authentication"
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-ministry-emerald text-xs disabled:bg-slate-100 font-mono"
+                />
+                {!editingUser && (
+                  <p className="mt-1.5 text-[10px] text-slate-500">
+                    This must be the real Firebase Auth UID. The app no longer creates fake local user IDs.
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 uppercase tracking-wider mb-1">
                   Full Name
                 </label>
                 <input
@@ -485,7 +519,7 @@ export const UserManagementPage: React.FC = () => {
                   type="submit"
                   className="px-5 py-2 bg-ministry-deepGreen hover:bg-ministry-forestDark text-white font-bold rounded-xl shadow-xs"
                 >
-                  {editingUser ? 'Save Updates' : 'Create User'}
+                  {editingUser ? 'Save Updates' : 'Create Ministry Profile'}
                 </button>
               </div>
             </form>
