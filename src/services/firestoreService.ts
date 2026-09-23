@@ -11,7 +11,53 @@ import {
   where,
   orderBy
 } from 'firebase/firestore';
-import { db, isFirebaseConfigured } from '../config/firebase';
+import { db, isFirebaseConfigured, firebaseConfig } from '../config/firebase';
+
+function fromFirestoreValue(value: any): any {
+  if (!value || typeof value !== 'object') return value;
+  if ('stringValue' in value) return value.stringValue;
+  if ('integerValue' in value) return Number(value.integerValue);
+  if ('doubleValue' in value) return Number(value.doubleValue);
+  if ('booleanValue' in value) return value.booleanValue;
+  if ('nullValue' in value) return null;
+  if ('timestampValue' in value) return value.timestampValue;
+  if ('arrayValue' in value) return (value.arrayValue.values || []).map(fromFirestoreValue);
+  if ('mapValue' in value) {
+    const out: Record<string, any> = {};
+    for (const [key, val] of Object.entries(value.mapValue.fields || {})) out[key] = fromFirestoreValue(val);
+    return out;
+  }
+  return value;
+}
+
+async function getUserByIdViaRest(uid: string, idToken: string): Promise<T.UserProfile | null> {
+  const url =
+    `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(firebaseConfig.projectId)}/databases/(default)/documents/users/${encodeURIComponent(uid)}?key=${encodeURIComponent(firebaseConfig.apiKey)}`;
+
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${idToken}`,
+      Accept: 'application/json'
+    },
+    cache: 'no-store'
+  });
+
+  if (response.status === 404) return null;
+
+  const body = await response.text();
+  if (!response.ok) {
+    throw new Error(`Firestore REST request failed (${response.status}): ${body.slice(0, 300)}`);
+  }
+
+  const parsed = JSON.parse(body);
+  return {
+    uid,
+    ...(Object.fromEntries(
+      Object.entries(parsed.fields || {}).map(([key, value]) => [key, fromFirestoreValue(value)])
+    ) as T.UserProfile)
+  };
+}
 import * as T from '../types';
 
 // Storage keys for offline/dev fallback
@@ -78,14 +124,23 @@ export async function getUsers(): Promise<T.UserProfile[]> {
   return getLocal<T.UserProfile>(K_USERS, SEED_USERS);
 }
 
-export async function getUserById(uid: string): Promise<T.UserProfile | null> {
+export async function getUserById(uid: string, idToken?: string): Promise<T.UserProfile | null> {
   if (isFirebaseConfigured) {
     try {
       const snap = await getDoc(doc(db, 'users', uid));
       if (snap.exists()) {
         return { uid: snap.id, ...snap.data() } as T.UserProfile;
       }
-    } catch (e) {
+    } catch (e: any) {
+      const isOffline =
+        e?.code === 'unavailable' ||
+        String(e?.message || '').toLowerCase().includes('client is offline');
+
+      if (isOffline && idToken) {
+        console.warn('Firestore SDK is offline; trying authenticated Firestore REST fallback.');
+        return await getUserByIdViaRest(uid, idToken);
+      }
+
       throw e;
     }
   }
