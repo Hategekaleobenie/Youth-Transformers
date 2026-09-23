@@ -51,12 +51,11 @@ async function getUserByIdViaRest(uid: string, idToken: string): Promise<T.UserP
   }
 
   const parsed = JSON.parse(body);
-  return {
-    uid,
-    ...(Object.fromEntries(
-      Object.entries(parsed.fields || {}).map(([key, value]) => [key, fromFirestoreValue(value)])
-    ) as T.UserProfile)
-  };
+  const data = Object.fromEntries(
+    Object.entries(parsed.fields || {}).map(([key, value]) => [key, fromFirestoreValue(value)])
+  ) as T.UserProfile;
+
+  return { ...data, uid };
 }
 import * as T from '../types';
 
