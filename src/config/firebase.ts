@@ -38,8 +38,7 @@ export const auth: Auth = getAuth(app);
 let db: Firestore;
 try {
   db = initializeFirestore(app, {
-    experimentalForceLongPolling: true,
-    useFetchStreams: false
+    experimentalForceLongPolling: true
   });
 } catch {
   // Reuse the existing instance during hot reload or if another module
