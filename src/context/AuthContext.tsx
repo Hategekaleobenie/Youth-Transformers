@@ -53,7 +53,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setFirebaseUser(fbUser);
         if (fbUser) {
           try {
-            const profile = await getUserById(fbUser.uid);
+            const profile = await getUserById(fbUser.uid, await fbUser.getIdToken());
             if (profile) {
               if (profile.status === 'disabled') {
                 await firebaseSignOut(auth);
@@ -124,7 +124,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (isFirebaseConfigured) {
       try {
         const cred = await signInWithEmailAndPassword(auth, email, pass);
-        const profile = await getUserById(cred.user.uid);
+        const profile = await getUserById(cred.user.uid, await cred.user.getIdToken());
         if (profile && profile.status === 'disabled') {
           await firebaseSignOut(auth);
           setCurrentUser(null);
@@ -142,10 +142,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
 
         if (profile) {
-          profile.lastLoginAt = Date.now();
-          await saveUser(profile);
+          // Do not write lastLoginAt during sign-in. Firestore rules intentionally
+          // prevent ordinary users from modifying their own profile document.
+          // Authentication and profile loading are sufficient to establish the session.
           setCurrentUser(profile);
-          await logActivity({
+          void logActivity({
             actorUid: profile.uid,
             actorName: profile.displayName,
             actorRole: profile.role,
