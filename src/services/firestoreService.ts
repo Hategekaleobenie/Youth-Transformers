@@ -30,6 +30,78 @@ function fromFirestoreValue(value: any): any {
   return value;
 }
 
+function toFirestoreValue(value: any): any {
+  if (value === null) return { nullValue: null };
+  if (typeof value === 'string') return { stringValue: value };
+  if (typeof value === 'boolean') return { booleanValue: value };
+  if (typeof value === 'number') {
+    return Number.isInteger(value) ? { integerValue: String(value) } : { doubleValue: value };
+  }
+  if (Array.isArray(value)) return { arrayValue: { values: value.map(toFirestoreValue) } };
+  if (typeof value === 'object') {
+    const fields: Record<string, any> = {};
+    for (const [key, item] of Object.entries(value)) fields[key] = toFirestoreValue(item);
+    return { mapValue: { fields } };
+  }
+  return { nullValue: null };
+}
+
+async function createUserProfileViaRest(user: T.UserProfile, idToken: string): Promise<T.UserProfile> {
+  const url =
+    `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(firebaseConfig.projectId)}/databases/(default)/documents/users/${encodeURIComponent(user.uid)}?key=${encodeURIComponent(firebaseConfig.apiKey)}`;
+
+  const response = await fetch(url, {
+    method: 'PATCH',
+    headers: {
+      Authorization: `Bearer ${idToken}`,
+      'Content-Type': 'application/json',
+      Accept: 'application/json'
+    },
+    body: JSON.stringify({
+      fields: Object.fromEntries(
+        Object.entries(user)
+          .filter(([key]) => key !== 'uid')
+          .map(([key, value]) => [key, toFirestoreValue(value)])
+      )
+    }),
+    cache: 'no-store'
+  });
+
+  const body = await response.text();
+  if (!response.ok) {
+    throw new Error(`Firestore REST profile creation failed (${response.status}): ${body.slice(0, 300)}`);
+  }
+
+  return user;
+}
+
+export async function bootstrapLeaderProfile(
+  uid: string,
+  email: string,
+  displayName: string,
+  idToken: string
+): Promise<T.UserProfile | null> {
+  const normalizedEmail = email.trim().toLowerCase();
+  if (normalizedEmail !== 'hategekabenie@gmail.com') return null;
+
+  const now = Date.now();
+  const profile: T.UserProfile = {
+    uid,
+    email: normalizedEmail,
+    displayName: displayName.trim() || 'Leo Benie Hategeka',
+    phone: '',
+    role: 'leader',
+    department: 'General Leadership & Oversight',
+    status: 'active',
+    createdAt: now,
+    lastLoginAt: now,
+    assignedPermissions: ['*']
+  };
+
+  await createUserProfileViaRest(profile, idToken);
+  return profile;
+}
+
 async function getUserByIdViaRest(uid: string, idToken: string): Promise<T.UserProfile | null> {
   const url =
     `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(firebaseConfig.projectId)}/databases/(default)/documents/users/${encodeURIComponent(uid)}?key=${encodeURIComponent(firebaseConfig.apiKey)}`;
