@@ -6,7 +6,7 @@ import { getStorage, FirebaseStorage } from 'firebase/storage';
 // Firebase Web App configuration.
 // These values are safe to ship in a browser app; Firebase Security Rules
 // and Authentication control access to the data.
-const firebaseConfig = {
+export const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyDPoE4myxgYGL89rgJpwqyDYuGAZRUO6Y0",
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "youth-transformers-database.firebaseapp.com",
   projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "youth-transformers-database",
