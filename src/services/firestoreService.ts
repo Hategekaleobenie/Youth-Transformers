@@ -126,24 +126,28 @@ export async function getUsers(): Promise<T.UserProfile[]> {
 
 export async function getUserById(uid: string, idToken?: string): Promise<T.UserProfile | null> {
   if (isFirebaseConfigured) {
+    // Authentication already gives us an ID token. Use the authenticated
+    // Firestore REST endpoint first so profile loading does not depend on the
+    // browser's Firestore WebChannel transport.
+    if (idToken) {
+      try {
+        return await getUserByIdViaRest(uid, idToken);
+      } catch (restError) {
+        console.warn('Firestore REST profile read failed; falling back to SDK:', restError);
+      }
+    }
+
     try {
       const snap = await getDoc(doc(db, 'users', uid));
       if (snap.exists()) {
         return { uid: snap.id, ...snap.data() } as T.UserProfile;
       }
+      return null;
     } catch (e: any) {
-      const isOffline =
-        e?.code === 'unavailable' ||
-        String(e?.message || '').toLowerCase().includes('client is offline');
-
-      if (isOffline && idToken) {
-        console.warn('Firestore SDK is offline; trying authenticated Firestore REST fallback.');
-        return await getUserByIdViaRest(uid, idToken);
-      }
-
       throw e;
     }
   }
+
   const all = await getUsers();
   return all.find(u => u.uid === uid) || null;
 }
