@@ -8,7 +8,7 @@ import {
   User as FirebaseUser
 } from 'firebase/auth';
 import { auth, isFirebaseConfigured } from '../config/firebase';
-import { getUserById, getUsers, saveUser } from '../services/firestoreService';
+import { bootstrapLeaderProfile, getUserById, getUsers, saveUser } from '../services/firestoreService';
 import { logActivity } from '../services/activityLogService';
 import { UserProfile, MinistryRole, ModuleName, PermissionAction } from '../types';
 import { LanguageCode, getTranslation } from '../locales/i18n';
@@ -75,12 +75,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 setError(null);
               }
             } else {
-              // Never auto-provision an authenticated user into the ministry.
-              // A Firebase Auth account must have an explicitly created Firestore
-              // ministry profile before it can access the application.
-              await firebaseSignOut(auth);
-              setCurrentUser(null);
-              setError('Your Firebase account is valid, but no Youth Transformers ministry profile is assigned to it. Ask the leader to create/assign your ministry profile.');
+              // One-time bootstrap for the ministry leader account. The Firestore
+              // rules allow this exact verified email to create only its own
+              // leader profile, after which normal leader rules take over.
+              const idToken = await fbUser.getIdToken();
+              const bootstrapped = await bootstrapLeaderProfile(
+                fbUser.uid,
+                fbUser.email || '',
+                fbUser.displayName || 'Leo Benie Hategeka',
+                idToken
+              );
+
+              if (bootstrapped) {
+                setCurrentUser(bootstrapped);
+                setError(null);
+              } else {
+                await firebaseSignOut(auth);
+                setCurrentUser(null);
+                setError('Your Firebase account is valid, but no Youth Transformers ministry profile is assigned to it. Ask the leader to create/assign your ministry profile.');
+              }
             }
           } catch (err: any) {
             console.error('Error fetching user profile:', err);
@@ -134,6 +147,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
 
         if (!profile) {
+          const idToken = await cred.user.getIdToken();
+          const bootstrapped = await bootstrapLeaderProfile(
+            cred.user.uid,
+            cred.user.email || email,
+            cred.user.displayName || 'Leo Benie Hategeka',
+            idToken
+          );
+
+          if (bootstrapped) {
+            setCurrentUser(bootstrapped);
+            setLoading(false);
+            return true;
+          }
+
           await firebaseSignOut(auth);
           setCurrentUser(null);
           setError('Your Firebase account exists, but your Youth Transformers ministry profile is missing. Ask the leader to create/assign your profile.');
