@@ -38,6 +38,20 @@ service cloud.firestore {
     // - A user cannot change their own role, status, or assignedPermissions
     match /users/{userId} {
       allow read: if isAuthenticated() && (request.auth.uid == userId || isLeader());
+
+      // One-time bootstrap for the known ministry leader account.
+      // This is intentionally narrow: only the exact authenticated email can
+      // create its own profile, and only as an active leader with full access.
+      allow create: if (
+        isAuthenticated() &&
+        request.auth.uid == userId &&
+        request.auth.token.email == 'hategekabenie@gmail.com' &&
+        request.resource.data.email == 'hategekabenie@gmail.com' &&
+        request.resource.data.role == 'leader' &&
+        request.resource.data.status == 'active' &&
+        request.resource.data.assignedPermissions == ['*']
+      );
+
       allow create, update, delete: if isLeader();
     }
 
