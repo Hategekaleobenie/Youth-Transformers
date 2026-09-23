@@ -1,11 +1,11 @@
 import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
 import { getAuth, Auth } from 'firebase/auth';
-import { getFirestore, Firestore } from 'firebase/firestore';
+import { initializeFirestore, getFirestore, Firestore } from 'firebase/firestore';
 import { getStorage, FirebaseStorage } from 'firebase/storage';
 
 // Firebase Web App configuration.
-// Web Firebase config values are intended to be included in client-side builds.
-// Environment variables can still override these values when supplied.
+// These values are safe to ship in a browser app; Firebase Security Rules
+// and Authentication control access to the data.
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyDPoE4myxgYGL89rgJpwqyDYuGAZRUO6Y0",
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "youth-transformers-database.firebaseapp.com",
@@ -30,6 +30,23 @@ if (getApps().length) {
 }
 
 export const auth: Auth = getAuth(app);
-export const db: Firestore = getFirestore(app);
+
+// Some networks/proxies have trouble with Firestore's default WebChannel
+// transport and report "Failed to get document because the client is offline"
+// even while normal internet access is working. Long polling is more tolerant
+// of those environments.
+let db: Firestore;
+try {
+  db = initializeFirestore(app, {
+    experimentalForceLongPolling: true,
+    useFetchStreams: false
+  });
+} catch {
+  // Reuse the existing instance during hot reload or if another module
+  // initialized Firestore first.
+  db = getFirestore(app);
+}
+export { db };
+
 export const storage: FirebaseStorage = getStorage(app);
 export default app;
