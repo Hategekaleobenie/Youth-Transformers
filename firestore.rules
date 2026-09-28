@@ -39,20 +39,28 @@ service cloud.firestore {
     match /users/{userId} {
       allow read: if isAuthenticated() && (request.auth.uid == userId || isLeader());
 
-      // One-time bootstrap for the known ministry leader account.
-      // This is intentionally narrow: only the exact authenticated email can
-      // create its own profile, and only as an active leader with full access.
+      // First-login provisioning: the authenticated UID can create only
+      // its own profile, and only for an exact ministry email/role pair.
       allow create: if (
         isAuthenticated() &&
         request.auth.uid == userId &&
-        request.auth.token.email == 'hategekabenie@gmail.com' &&
-        request.resource.data.email == 'hategekabenie@gmail.com' &&
-        request.resource.data.role == 'leader' &&
+        request.resource.data.email == request.auth.token.email &&
         request.resource.data.status == 'active' &&
-        request.resource.data.assignedPermissions == ['*']
+        (
+          (request.auth.token.email == 'leo@youthtransformers.org' && request.resource.data.role == 'leader') ||
+          (request.auth.token.email == 'green@youthtransformers.org' && request.resource.data.role == 'committee_coordinator') ||
+          (request.auth.token.email == 'bonheur@youthtransformers.org' && request.resource.data.role == 'level1_leader') ||
+          (request.auth.token.email == 'livia@youthtransformers.org' && request.resource.data.role == 'social_media') ||
+          (request.auth.token.email == 'kellia@youthtransformers.org' && request.resource.data.role == 'social_media') ||
+          (request.auth.token.email == 'cedrick@youthtransformers.org' && request.resource.data.role == 'member_care') ||
+          (request.auth.token.email == 'liona@youthtransformers.org' && request.resource.data.role == 'bible_study') ||
+          (request.auth.token.email == 'ebenezer@youthtransformers.org' && request.resource.data.role == 'accountant') ||
+          (request.auth.token.email == 'rene@youthtransformers.org' && request.resource.data.role == 'projects_manager') ||
+          (request.auth.token.email == 'member@youthtransformers.org' && request.resource.data.role == 'member')
+        )
       );
 
-      allow create, update, delete: if isLeader();
+      allow update, delete: if isLeader();
     }
 
     // Roles and Permissions Registry
