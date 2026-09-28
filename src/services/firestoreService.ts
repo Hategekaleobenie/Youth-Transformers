@@ -82,20 +82,22 @@ export async function bootstrapLeaderProfile(
   idToken: string
 ): Promise<T.UserProfile | null> {
   const normalizedEmail = email.trim().toLowerCase();
-  if (normalizedEmail !== 'hategekabenie@gmail.com') return null;
+  const template = SEED_USERS.find(
+    user => user.email.trim().toLowerCase() === normalizedEmail
+  );
+
+  // Only ministry accounts listed in the canonical registry may bootstrap.
+  // The Firestore rules independently verify the same email/role pair.
+  if (!template) return null;
 
   const now = Date.now();
   const profile: T.UserProfile = {
+    ...template,
     uid,
     email: normalizedEmail,
-    displayName: displayName.trim() || 'Leo Benie Hategeka',
-    phone: '',
-    role: 'leader',
-    department: 'General Leadership & Oversight',
-    status: 'active',
+    displayName: displayName.trim() || template.displayName,
     createdAt: now,
-    lastLoginAt: now,
-    assignedPermissions: ['*']
+    lastLoginAt: now
   };
 
   await createUserProfileViaRest(profile, idToken);
