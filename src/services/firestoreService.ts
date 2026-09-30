@@ -674,7 +674,7 @@ const now = Date.now();
 export const SEED_USERS: T.UserProfile[] = [
   {
     uid: 'usr_leo_hategeka',
-    email: 'leo@youthtransformers.org',
+    email: 'hategekabenie@gmail.com',
     displayName: 'Leo Benie Hategeka',
     phone: '+250 788 000 001',
     role: 'leader',
@@ -686,7 +686,7 @@ export const SEED_USERS: T.UserProfile[] = [
   },
   {
     uid: 'usr_green_london',
-    email: 'green@youthtransformers.org',
+    email: 'greenlondon210@gmail.com',
     displayName: 'Green London',
     phone: '+250 788 000 002',
     role: 'committee_coordinator',
@@ -710,7 +710,7 @@ export const SEED_USERS: T.UserProfile[] = [
   },
   {
     uid: 'usr_livia_kirezi',
-    email: 'livia@youthtransformers.org',
+    email: 'kirezilivia1@gmail.com',
     displayName: 'Livia Kirezi',
     phone: '+250 788 000 004',
     role: 'social_media',
@@ -734,7 +734,7 @@ export const SEED_USERS: T.UserProfile[] = [
   },
   {
     uid: 'usr_cedrick_gisubizo',
-    email: 'cedrick@youthtransformers.org',
+    email: 'gisubizocedrick720@gmail.com',
     displayName: 'Cedrick Gisubizo',
     phone: '+250 788 000 005',
     role: 'member_care',
@@ -746,7 +746,7 @@ export const SEED_USERS: T.UserProfile[] = [
   },
   {
     uid: 'usr_liona_akaliza',
-    email: 'liona@youthtransformers.org',
+    email: 'akalizaliona@gmail.com',
     displayName: 'Liona Akaliza',
     phone: '+250 788 000 006',
     role: 'bible_study',
@@ -758,7 +758,7 @@ export const SEED_USERS: T.UserProfile[] = [
   },
   {
     uid: 'usr_ebenezer_mugisha',
-    email: 'ebenezer@youthtransformers.org',
+    email: 'mugishaebenezer2025@gmail.com',
     displayName: 'Ebenezer Mugisha',
     phone: '+250 788 000 007',
     role: 'accountant',
@@ -770,7 +770,7 @@ export const SEED_USERS: T.UserProfile[] = [
   },
   {
     uid: 'usr_rene_cyubahiro',
-    email: 'rene@youthtransformers.org',
+    email: 'niyibeshahocyubahiro@gmail.com',
     displayName: 'Rene Cyubahiro',
     phone: '+250 788 000 008',
     role: 'projects_manager',
