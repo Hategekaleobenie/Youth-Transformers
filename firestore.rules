@@ -47,15 +47,15 @@ service cloud.firestore {
         request.resource.data.email == request.auth.token.email &&
         request.resource.data.status == 'active' &&
         (
-          (request.auth.token.email == 'leo@youthtransformers.org' && request.resource.data.role == 'leader') ||
-          (request.auth.token.email == 'green@youthtransformers.org' && request.resource.data.role == 'committee_coordinator') ||
+          (request.auth.token.email == 'hategekabenie@gmail.com' && request.resource.data.role == 'leader') ||
+          (request.auth.token.email == 'greenlondon210@gmail.com' && request.resource.data.role == 'committee_coordinator') ||
           (request.auth.token.email == 'bonheur@youthtransformers.org' && request.resource.data.role == 'level1_leader') ||
-          (request.auth.token.email == 'livia@youthtransformers.org' && request.resource.data.role == 'social_media') ||
+          (request.auth.token.email == 'kirezilivia1@gmail.com' && request.resource.data.role == 'social_media') ||
           (request.auth.token.email == 'kellia@youthtransformers.org' && request.resource.data.role == 'social_media') ||
-          (request.auth.token.email == 'cedrick@youthtransformers.org' && request.resource.data.role == 'member_care') ||
-          (request.auth.token.email == 'liona@youthtransformers.org' && request.resource.data.role == 'bible_study') ||
-          (request.auth.token.email == 'ebenezer@youthtransformers.org' && request.resource.data.role == 'accountant') ||
-          (request.auth.token.email == 'rene@youthtransformers.org' && request.resource.data.role == 'projects_manager') ||
+          (request.auth.token.email == 'gisubizocedrick720@gmail.com' && request.resource.data.role == 'member_care') ||
+          (request.auth.token.email == 'akalizaliona@gmail.com' && request.resource.data.role == 'bible_study') ||
+          (request.auth.token.email == 'mugishaebenezer2025@gmail.com' && request.resource.data.role == 'accountant') ||
+          (request.auth.token.email == 'niyibeshahocyubahiro@gmail.com' && request.resource.data.role == 'projects_manager') ||
           (request.auth.token.email == 'member@youthtransformers.org' && request.resource.data.role == 'member')
         )
       );
